@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHRGE+ | Waitlist Admin</title>
+<meta name="robots" content="noindex, nofollow">
+
+<!-- ============================================================
+FIREBASE SETUP
+------------------------------------------------------------
+Use the EXACT SAME config you pasted into index.html (the
+landing page) — this dashboard reads from the same `waitlist`
+collection that page writes to. Paste it below where you see
+"YOUR_API_KEY".
+
+NOTE ON SECURITY: the Firestore rules suggested for the landing
+page (allow create, deny read) will make this dashboard unable
+to read data from the browser. You have two options:
+
+  OPTION A (quick — only use while it's just you testing):
+    Temporarily allow reads too:
+      match /waitlist/{doc} {
+        allow create: if true;
+        allow read: if true;
+        allow update, delete: if false;
+      }
+    Anyone who finds this page's URL and has network access
+    could then read the waitlist collection — fine for a
+    private pilot, not once this is public-facing.
+
+  OPTION B (correct long-term):
+    Keep reads locked down, and instead view signups via the
+    Firebase Console (console.firebase.google.com → your
+    project → Firestore Database → waitlist), or put this
+    admin page behind Firebase Auth so only you can log in
+    and read. Ask for the Auth-gated version when you're
+    ready — it's a straightforward addition.
+
+ALSO: this file has "noindex, nofollow" in its meta tags and
+is not linked from the public landing page, so search engines
+won't find it — but the URL itself isn't secret if someone
+guesses it. Don't put anything here you wouldn't want a
+stranger with the link to see, until Option B is in place.
+============================================================ -->
+
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getFirestore, collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  // ============================================================
+  // PASTE YOUR FIREBASE CONFIG HERE — same as index.html
+  // ============================================================
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "chrge-plus.firebaseapp.com",
+    projectId: "chrge-plus",
+    storageBucket: "chrge-plus.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+
+  try {
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    window.__chrgeFirestore = { db, collection, getDocs, query, orderBy };
+    window.__chrgeFirebaseReady = true;
+  } catch (e) {
+    console.error('Firebase init failed', e);
+    window.__chrgeFirebaseReady = false;
+  }
+</script>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #0A0A0A; }
+  ::selection { background: #C3F60C; color: #0A0A0A; }
+  input::placeholder { color: #6b6b68; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { text-align: left; padding: 0.85rem 1rem; font-size: 0.85rem; }
+  thead th {
+    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 0.72rem;
+    letter-spacing: 0.08em; text-transform: uppercase; color: #6b6b68;
+    border-bottom: 1px solid rgba(244,244,242,0.1);
+  }
+  tbody tr { border-bottom: 1px solid rgba(244,244,242,0.05); }
+  tbody tr:hover { background: rgba(244,244,242,0.02); }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+
+// ============================================================
+// INLINE ICONS
+// ============================================================
+const Icon = {
+  Users: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  Store: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-6h16l1 6"/><path d="M3 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/></svg>,
+  RefreshCw: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={p.style}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
+  Search: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+  Download: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  AlertCircle: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+};
+
+// ============================================================
+// FIRESTORE FETCH
+// ============================================================
+async function fetchWaitlist() {
+  if (!window.__chrgeFirebaseReady || !window.__chrgeFirestore) {
+    throw new Error('firebase-unavailable');
+  }
+  const { db, collection, getDocs, query, orderBy } = window.__chrgeFirestore;
+  const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ============================================================
+// LOGO
+// ============================================================
+function ChrgeLogo({ style = {}, fill = '#F4F4F2' }) {
+  return (
+    <svg viewBox="0 0 1942 809" style={style} fill="none">
+      <g transform="translate(0,809) scale(0.1,-0.1)" fill={fill} stroke="none">
+        <path d="M2282 5120 c-97 -26 -162 -62 -221 -125 -60 -64 -94 -128 -115 -222
+        -14 -62 -16 -157 -16 -712 0 -692 3 -735 54 -843 53 -111 144 -188 270 -227
+        67 -21 83 -21 861 -21 448 0 814 4 841 9 265 51 419 272 394 571 l-5 65 -234
+        3 c-151 1 -238 -1 -246 -8 -7 -6 -15 -35 -17 -66 -5 -58 -24 -93 -72 -128 -27
+        -21 -40 -21 -609 -24 -320 -2 -596 0 -614 3 -39 7 -87 46 -111 89 -15 28 -17
+        79 -19 521 -1 270 2 519 7 554 10 76 31 108 90 139 l44 22 576 0 576 0 44 -22
+        c57 -30 80 -63 88 -129 l7 -54 250 0 250 0 -3 100 c-3 133 -17 196 -59 278
+        -58 110 -153 182 -298 224 -54 16 -133 18 -850 20 -754 2 -793 1 -863 -17z
+        M4758 5129 c-17 -9 -18 -71 -18 -1072 0 -814 3 -1066 12 -1075 9 -9 76 -12
+        240 -12 214 0 228 1 238 19 6 13 10 174 10 454 0 387 2 436 16 441 9 3 298 6
+        643 6 474 0 630 -3 639 -12 9 -9 12 -122 12 -448 0 -326 3 -439 12 -448 17
+        -17 459 -17 476 0 9 9 12 261 12 1075 0 1040 0 1063 -19 1073 -12 6 -106 10
+        -235 10 -182 0 -217 -2 -230 -16 -14 -13 -16 -65 -16 -418 0 -299 -3 -405 -12
+        -414 -9 -9 -165 -12 -639 -12 -345 0 -634 3 -643 6 -14 5 -16 51 -16 414 0
+        381 -1 408 -18 423 -16 15 -47 17 -233 17 -127 0 -221 -5 -231 -11z M7498
+        5129 c-17 -9 -18 -71 -18 -1072 0 -814 3 -1066 12 -1075 18 -18 461 -17 477 1
+        7 10 12 131 13 383 l3 369 357 3 357 2 24 -22 c22 -20 209 -311 405 -628 36
+        -58 70 -108 76 -112 6 -4 129 -8 272 -8 200 0 264 3 272 13 11 13 9 17 -300
+        498 -86 135 -160 253 -163 261 -5 12 4 17 37 22 131 21 295 149 356 276 53
+        112 65 201 60 448 -4 204 -6 222 -31 291 -73 207 -221 312 -492 351 -96 13
+        -1694 13 -1717 -1z m1601 -419 c58 -16 100 -52 127 -107 25 -49 26 -60 23
+        -175 -4 -112 -6 -127 -31 -169 -19 -31 -42 -54 -80 -75 l-53 -29 -538 -3
+        c-399 -2 -543 0 -553 9 -11 9 -14 62 -14 279 0 146 3 270 7 273 10 11 1074 8
+        1112 -3z M10434 5125 c-181 -39 -301 -154 -352 -338 -15 -56 -17 -128 -17
+        -732 0 -606 2 -676 17 -733 50 -181 159 -294 323 -337 87 -22 1617 -22 1713 0
+        184 43 312 176 357 368 13 55 15 138 13 494 l-3 428 -645 0 -644 0 -58 -175
+        c-32 -96 -58 -183 -58 -192 0 -17 30 -18 453 -20 l452 -3 0 -197 c0 -224 -3
+        -233 -85 -275 l-44 -23 -582 0 -581 0 -44 23 c-31 16 -51 36 -66 67 -23 44
+        -23 44 -23 575 0 531 0 531 23 575 15 31 35 51 66 67 l44 23 887 0 c676 0 889
+        3 898 12 8 8 12 67 12 198 0 131 -4 190 -12 198 -18 18 -1959 16 -2044 -3z
+        M12966 5124 c-13 -13 -16 -45 -16 -190 0 -102 4 -183 10 -195 10 -19 33 -19
+        1048 -19 794 0 1041 3 1050 12 17 17 17 379 0 396 -9 9 -255 12 -1044 12 -925
+        0 -1034 -2 -1048 -16z M16397 4922 c-15 -16 -17 -52 -17 -296 0 -172 -4 -285
+        -10 -297 -10 -18 -24 -19 -298 -19 -244 0 -291 -2 -310 -16 -22 -15 -22 -19
+        -22 -228 0 -194 2 -214 18 -229 16 -15 52 -17 304 -17 263 0 286 -1 301 -18
+        15 -16 17 -52 17 -299 0 -258 1 -281 18 -296 16 -15 47 -17 230 -17 199 0 213
+        1 232 20 19 19 20 33 20 303 0 207 3 286 12 295 9 9 89 12 300 12 275 0 289 1
+        308 20 19 19 20 33 20 225 0 192 -1 206 -20 225 -19 19 -33 20 -308 20 -211 0
+        -291 3 -300 12 -9 9 -12 88 -12 295 0 270 -1 284 -20 303 -19 19 -33 20 -233
+        20 -195 0 -215 -2 -230 -18z M12962 4268 c-18 -18 -17 -1257 1 -1281 11 -16
+        83 -17 1057 -15 l1045 3 3 194 c2 134 -1 198 -9 207 -10 12 -143 14 -803 14
+        -603 0 -795 3 -804 12 -9 9 -12 75 -12 233 0 202 2 223 18 238 17 15 91 17
+        813 19 l794 3 0 190 0 190 -1045 3 c-805 2 -1049 -1 -1058 -10z"/>
+      </g>
+    </svg>
+  );
+}
+
+const fmtDate = (ts) => {
+  if (!ts) return '—';
+  try {
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '—';
+  }
+};
+
+function StatCard({ label, value, icon: IconComp }) {
+  return (
+    <div style={{ background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderRadius: '14px', padding: '1.4rem 1.6rem', display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
+      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(195,246,12,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <IconComp size={19} color="#C3F60C" />
+      </div>
+      <div>
+        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '1.5rem', color: '#F4F4F2', lineHeight: 1 }}>{value}</div>
+        <div style={{ color: '#9a9a96', fontSize: '0.8rem', marginTop: '0.2rem' }}>{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function ChrgePlusAdmin() {
+  const [entries, setEntries] = useState([]);
+  const [status, setStatus] = useState('idle');
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  const load = useCallback(async () => {
+    setStatus('loading');
+    try {
+      const data = await fetchWaitlist();
+      setEntries(data);
+      setStatus('success');
+    } catch (e) {
+      setStatus('error');
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = entries.filter(e => {
+    if (filter !== 'all' && e.role !== filter) return false;
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      return (e.name || '').toLowerCase().includes(s) ||
+             (e.email || '').toLowerCase().includes(s) ||
+             (e.city || '').toLowerCase().includes(s) ||
+             (e.venueName || '').toLowerCase().includes(s);
+    }
+    return true;
+  });
+
+  const userCount = entries.filter(e => e.role === 'user').length;
+  const venueCount = entries.filter(e => e.role === 'venue').length;
+
+  const exportCsv = () => {
+    const rows = [['Name', 'Email', 'Role', 'City', 'Venue', 'Joined']];
+    filtered.forEach(e => {
+      rows.push([e.name || '', e.email || '', e.role || '', e.city || '', e.venueName || '', fmtDate(e.createdAt)]);
+    });
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'chrge-plus-waitlist.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div style={{ background: '#0A0A0A', minHeight: '100vh', fontFamily: "'Inter', sans-serif", color: '#F4F4F2', padding: '2.5rem 1.5rem' }}>
+      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <ChrgeLogo style={{ width: '110px', marginBottom: '0.6rem' }} />
+            <div style={{ color: '#9a9a96', fontSize: '0.85rem' }}>Waitlist dashboard</div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.6rem' }}>
+            <button onClick={load} disabled={status === 'loading'} style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.1rem', borderRadius: '9px',
+              border: '1px solid rgba(244,244,242,0.14)', background: 'transparent', color: '#F4F4F2',
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.85rem',
+              cursor: status === 'loading' ? 'default' : 'pointer'
+            }}>
+              <Icon.RefreshCw size={15} style={{ animation: status === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
+              Refresh
+            </button>
+            <button onClick={exportCsv} disabled={filtered.length === 0} style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.1rem', borderRadius: '9px', border: 'none',
+              background: '#C3F60C', color: '#0A0A0A',
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.85rem',
+              cursor: filtered.length === 0 ? 'default' : 'pointer',
+              opacity: filtered.length === 0 ? 0.5 : 1
+            }}>
+              <Icon.Download size={15} />
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        {status === 'error' && (
+          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-start', background: 'rgba(255,138,138,0.08)', border: '1px solid rgba(255,138,138,0.3)', borderRadius: '12px', padding: '1.2rem 1.4rem', marginBottom: '1.6rem' }}>
+            <Icon.AlertCircle size={19} color="#ff8a8a" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.3rem' }}>Couldn't load the waitlist</div>
+              <div style={{ color: '#c9c9c5', fontSize: '0.83rem', lineHeight: 1.5 }}>
+                Either the Firebase config near the top of this file is still set to placeholder values, or your Firestore rules don't allow reads yet. See the setup notes in the HTML comments — you'll likely need to temporarily allow reads on the <code>waitlist</code> collection, or view signups directly in the Firebase Console instead.
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.6rem', flexWrap: 'wrap' }}>
+          <StatCard label="Total signups" value={entries.length} icon={Icon.Users} />
+          <StatCard label="Users" value={userCount} icon={Icon.Users} />
+          <StatCard label="Venues" value={venueCount} icon={Icon.Store} />
+        </div>
+
+        <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '1.2rem', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+            <Icon.Search size={15} color="#6b6b68" style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              type="text" placeholder="Search name, email, city..." value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ width: '100%', padding: '0.7rem 1rem 0.7rem 2.4rem', borderRadius: '9px', border: '1px solid rgba(244,244,242,0.12)', background: 'rgba(244,244,242,0.03)', color: '#F4F4F2', fontSize: '0.85rem', outline: 'none' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {['all', 'user', 'venue'].map(f => (
+              <button key={f} onClick={() => setFilter(f)} style={{
+                padding: '0.7rem 1.1rem', borderRadius: '9px',
+                border: filter === f ? '1px solid #C3F60C' : '1px solid rgba(244,244,242,0.12)',
+                background: filter === f ? 'rgba(195,246,12,0.08)' : 'transparent',
+                color: filter === f ? '#C3F60C' : '#9a9a96',
+                fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.8rem',
+                cursor: 'pointer', textTransform: 'capitalize'
+              }}>{f}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderRadius: '14px', overflow: 'hidden' }}>
+          {status === 'loading' && entries.length === 0 ? (
+            <div style={{ padding: '3rem', textAlign: 'center', color: '#6b6b68' }}>Loading signups…</div>
+          ) : filtered.length === 0 && status !== 'error' ? (
+            <div style={{ padding: '3rem', textAlign: 'center', color: '#6b6b68' }}>No signups {search || filter !== 'all' ? 'match this filter' : 'yet'}.</div>
+          ) : status === 'error' ? null : (
+            <div style={{ overflowX: 'auto' }}>
+              <table>
+                <thead>
+                  <tr><th>Name</th><th>Email</th><th>Role</th><th>City</th><th>Venue</th><th>Joined</th></tr>
+                </thead>
+                <tbody>
+                  {filtered.map(e => (
+                    <tr key={e.id}>
+                      <td style={{ fontWeight: 500 }}>{e.name || '—'}</td>
+                      <td style={{ color: '#c9c9c5' }}>{e.email}</td>
+                      <td>
+                        <span style={{
+                          padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.72rem',
+                          fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
+                          background: e.role === 'venue' ? 'rgba(195,246,12,0.12)' : 'rgba(244,244,242,0.08)',
+                          color: e.role === 'venue' ? '#C3F60C' : '#c9c9c5'
+                        }}>{e.role || 'user'}</span>
+                      </td>
+                      <td style={{ color: '#9a9a96' }}>{e.city || '—'}</td>
+                      <td style={{ color: '#9a9a96' }}>{e.venueName || '—'}</td>
+                      <td style={{ color: '#6b6b68', fontSize: '0.8rem' }}>{fmtDate(e.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<ChrgePlusAdmin />);
+</script>
+
+</body>
+</html>

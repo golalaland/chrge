@@ -84,7 +84,7 @@ FIREBASE SETUP
 
 <div id="root"></div>
 
-<script type="text/babel" data-presets="react">
+<script type="text/plain" id="app-source">
 const { useState, useEffect, useRef } = React;
 
 // ============================================================
@@ -573,6 +573,23 @@ function ChrgePlusLanding() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<ChrgePlusLanding />);
+</script>
+
+<script>
+  // Manually transform the JSX source above using the CLASSIC runtime
+  // (React.createElement calls), not Babel's automatic runtime — the
+  // automatic runtime compiles to `import { jsx } from "react/jsx-runtime"`,
+  // which is an ES module import statement a plain classic <script> tag
+  // cannot execute, and throws "Cannot use import statement outside a
+  // module." Using type="text/plain" above also stops Babel's automatic
+  // DOM-scanning from double-transforming this same source.
+  const _source = document.getElementById('app-source').textContent;
+  const _compiled = Babel.transform(_source, {
+    presets: [['react', { runtime: 'classic' }]]
+  }).code;
+  const _script = document.createElement('script');
+  _script.textContent = _compiled;
+  document.body.appendChild(_script);
 </script>
 
 </body>

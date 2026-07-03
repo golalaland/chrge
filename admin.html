@@ -98,7 +98,7 @@ stranger with the link to see, until Option B is in place.
 
 <div id="root"></div>
 
-<script type="text/babel" data-presets="react">
+<script type="text/plain" id="app-source">
 const { useState, useEffect, useCallback } = React;
 
 // ============================================================
@@ -368,6 +368,18 @@ function ChrgePlusAdmin() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<ChrgePlusAdmin />);
+</script>
+
+<script>
+  // Manually transform the JSX source above using the CLASSIC runtime —
+  // see the matching comment in index.html for why this is necessary.
+  const _source = document.getElementById('app-source').textContent;
+  const _compiled = Babel.transform(_source, {
+    presets: [['react', { runtime: 'classic' }]]
+  }).code;
+  const _script = document.createElement('script');
+  _script.textContent = _compiled;
+  document.body.appendChild(_script);
 </script>
 
 </body>

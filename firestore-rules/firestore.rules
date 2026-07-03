@@ -1,0 +1,87 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // HELPERS
+    // ============================================================
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // ============================================================
+    // ADMIN-ONLY COLLECTIONS
+    // ------------------------------------------------------------
+    // Nothing here is readable or writable by the public client.
+    // All writes to `codes`, `batches`, `products` in normal
+    // operation go through Cloud Functions (which use the Admin
+    // SDK and bypass these rules entirely) — these rules exist to
+    // stop a compromised or malicious client from writing directly
+    // to Firestore, and to let the admin dashboard *read* data.
+    // ============================================================
+
+    match /products/{productId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin(); // dashboard can create/edit product metadata directly
+    }
+
+    match /batches/{batchId} {
+      allow read: if isAdmin();
+      allow write: if false; // batches are only created via generateBatch Cloud Function
+    }
+
+    match /codes/{codeId} {
+      // Admins can read full code records (dashboard, search, code actions)
+      allow read: if isAdmin();
+      // Codes are NEVER written directly by any client — only by
+      // Cloud Functions using the Admin SDK (generateBatchCodes,
+      // verifyCode, disableCode, etc.)
+      allow write: if false;
+    }
+
+    match /scans/{scanId} {
+      allow read: if isAdmin();
+      allow write: if false; // only written by the verifyCode Cloud Function
+    }
+
+    match /admins/{adminId} {
+      // Admins can see the admin roster, but role changes must go
+      // through the provisionAdmin Cloud Function (which is itself
+      // gated to already-admin callers) — never direct writes.
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    match /printJobs/{jobId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin(); // marking as printed, etc.
+      allow delete: if false;
+    }
+
+    match /settings/{settingId} {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // ============================================================
+    // PUBLIC VERIFICATION LOOKUP
+    // ------------------------------------------------------------
+    // The public verification page does NOT read Firestore
+    // directly — it calls the `verifyCode` Cloud Function, which
+    // uses the Admin SDK server-side. This means there is no
+    // public read path into `codes` at all, which is what stops
+    // someone from listing/scraping every valid code.
+    // ============================================================
+
+    // Default deny — nothing else is accessible.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

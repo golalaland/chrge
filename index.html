@@ -49,28 +49,55 @@ FIREBASE SETUP
   // ============================================================
   // PASTE YOUR FIREBASE CONFIG HERE (from the Firebase Console)
   // ============================================================
-  /* ── Firebase Configuration ── */
-  const firebaseConfig = {
-    apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
-    authDomain: "dettyverse.firebaseapp.com",
-    projectId: "dettyverse",
-    storageBucket: "cubeology",
-    messagingSenderId: "1036459652488",
-    appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
-    measurementId: "G-KPSCEYNZWX"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
+  authDomain: "dettyverse.firebaseapp.com",
+  projectId: "dettyverse",
+  storageBucket: "cubeology",
+  messagingSenderId: "1036459652488",
+  appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
+  measurementId: "G-KPSCEYNZWX"
+};
+
+try {
+  const app = initializeApp(firebaseConfig);
+
+  let db;
 
   try {
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    window.__chrgeFirestore = { db, collection, addDoc, serverTimestamp };
-    window.__chrgeFirebaseReady = true;
-  } catch (e) {
-    console.error('Firebase init failed', e);
-    window.__chrgeFirebaseReady = false;
-  }
-</script>
+    db = initializeFirestore(
+      app,
+      {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+      },
+      "cubeology" // Firestore database ID
+    );
 
+    console.log("📦 Firestore Database: cubeology (persistent cache)");
+  } catch (err) {
+    console.warn(
+      "[FIRESTORE] Persistent cache init failed, falling back:",
+      err
+    );
+
+    db = getFirestore(app, "cubeology");
+  }
+
+  window.__chrgeFirestore = {
+    db,
+    collection,
+    getDocs,
+    query,
+    orderBy
+  };
+
+  window.__chrgeFirebaseReady = true;
+} catch (e) {
+  console.error("Firebase init failed", e);
+  window.__chrgeFirebaseReady = false;
+}
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
   * { box-sizing: border-box; }

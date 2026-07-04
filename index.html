@@ -35,10 +35,16 @@ FIREBASE SETUP
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <!-- Firebase -->
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
+<script type="module">import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  collection,
+  addDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+   
   // ============================================================
   // PASTE YOUR FIREBASE CONFIG HERE (from the Firebase Console)
   // ============================================================
@@ -54,14 +60,33 @@ FIREBASE SETUP
   };
 
   try {
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    window.__chrgeFirestore = { db, collection, addDoc, serverTimestamp };
-    window.__chrgeFirebaseReady = true;
-  } catch (e) {
-    console.error('Firebase init failed', e);
-    window.__chrgeFirebaseReady = false;
-  }
+   const app = initializeApp(firebaseConfig);
+
+let db;
+
+try {
+  db = initializeFirestore(
+    app,
+    {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    },
+    "chrge"
+  );
+} catch (err) {
+  console.warn("Persistent cache unavailable:", err);
+  db = getFirestore(app, "chrge");
+}
+
+window.__chrgeFirestore = {
+  db,
+  collection,
+  addDoc,
+  serverTimestamp
+};
+
+window.__chrgeFirebaseReady = true;
 </script>
 
 <style>

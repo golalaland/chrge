@@ -1,77 +1,60 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CHRGE+ | Waitlist Admin</title>
-<meta name="robots" content="noindex, nofollow">
+<title>CHRGE+ | Never caught slippin' on empty</title>
+<meta name="description" content="Power banks wherever you go. Rent at any CHRGE+ station, return at any other. Join the waitlist.">
 
 <!-- ============================================================
 FIREBASE SETUP
 ------------------------------------------------------------
-Use the EXACT SAME config you pasted into index.html (the
-landing page) — this dashboard reads from the same `waitlist`
-collection that page writes to. Paste it below where you see
-"YOUR_API_KEY".
+1. Go to console.firebase.google.com → create a new project
+   (e.g. "chrge-plus")
+2. Add a Web App inside that project, copy the config object
+   it gives you, and paste it in place of the placeholder
+   further down this file (search for "YOUR_API_KEY").
+3. In Firestore, no need to pre-create anything — the first
+   signup will create the `waitlist` collection automatically.
+4. Set Firestore rules so writes are allowed but reads are not
+   exposed publicly:
 
-NOTE ON SECURITY: the Firestore rules suggested for the landing
-page (allow create, deny read) will make this dashboard unable
-to read data from the browser. You have two options:
+   match /waitlist/{doc} {
+     allow create: if true;
+     allow read, update, delete: if false;
+   }
 
-  OPTION A (quick — only use while it's just you testing):
-    Temporarily allow reads too:
-      match /waitlist/{doc} {
-        allow create: if true;
-        allow read: if true;
-        allow update, delete: if false;
-      }
-    Anyone who finds this page's URL and has network access
-    could then read the waitlist collection — fine for a
-    private pilot, not once this is public-facing.
-
-  OPTION B (correct long-term):
-    Keep reads locked down, and instead view signups via the
-    Firebase Console (console.firebase.google.com → your
-    project → Firestore Database → waitlist), or put this
-    admin page behind Firebase Auth so only you can log in
-    and read. Ask for the Auth-gated version when you're
-    ready — it's a straightforward addition.
-
-ALSO: this file has "noindex, nofollow" in its meta tags and
-is not linked from the public landing page, so search engines
-won't find it — but the URL itself isn't secret if someone
-guesses it. Don't put anything here you wouldn't want a
-stranger with the link to see, until Option B is in place.
+5. To go live: upload this single file to any static host —
+   Firebase Hosting, Netlify, Vercel, or even just drag-and-drop
+   into Firebase Hosting's console. No build step needed.
 ============================================================ -->
 
+<!-- React + ReactDOM + Babel (compiles JSX right in the browser) -->
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+<!-- Firebase -->
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
   // ============================================================
-  // PASTE YOUR FIREBASE CONFIG HERE — same as index.html
+  // PASTE YOUR FIREBASE CONFIG HERE (from the Firebase Console)
   // ============================================================
   const firebaseConfig = {
-    apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
-    authDomain: "dettyverse.firebaseapp.com",
-    projectId: "dettyverse",
-    storageBucket: "cubeology",
-    messagingSenderId: "1036459652488",
-    appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
-    measurementId: "G-KPSCEYNZWX"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "chrge-plus.firebaseapp.com",
+    projectId: "chrge-plus",
+    storageBucket: "chrge-plus.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
   };
 
   try {
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    window.__chrgeFirestore = { db, collection, getDocs, query, orderBy };
+    window.__chrgeFirestore = { db, collection, addDoc, serverTimestamp };
     window.__chrgeFirebaseReady = true;
   } catch (e) {
     console.error('Firebase init failed', e);
@@ -86,50 +69,51 @@ stranger with the link to see, until Option B is in place.
   body { background: #0A0A0A; }
   ::selection { background: #C3F60C; color: #0A0A0A; }
   input::placeholder { color: #6b6b68; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { text-align: left; padding: 0.85rem 1rem; font-size: 0.85rem; }
-  thead th {
-    font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 0.72rem;
-    letter-spacing: 0.08em; text-transform: uppercase; color: #6b6b68;
-    border-bottom: 1px solid rgba(244,244,242,0.1);
+  input:focus { border-color: #C3F60C !important; }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
   }
-  tbody tr { border-bottom: 1px solid rgba(244,244,242,0.05); }
-  tbody tr:hover { background: rgba(244,244,242,0.02); }
-  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @media (max-width: 860px) {
+    .hero-grid { grid-template-columns: 1fr !important; }
+    .how-grid { grid-template-columns: 1fr !important; }
+    .venue-grid { grid-template-columns: 1fr !important; }
+  }
 </style>
-
 </head>
 <body>
 
 <div id="root"></div>
 
 <script type="text/plain" id="app-source">
-const { useState, useEffect, useCallback } = React;
+const { useState, useEffect, useRef } = React;
 
 // ============================================================
-// INLINE ICONS
+// WAITLIST SUBMIT
 // ============================================================
-const Icon = {
-  Users: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-  Store: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-6h16l1 6"/><path d="M3 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/></svg>,
-  RefreshCw: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={p.style}><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
-  Search: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
-  Download: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
-  AlertCircle: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-};
-
-// ============================================================
-// FIRESTORE FETCH
-// ============================================================
-async function fetchWaitlist() {
+async function submitToWaitlist(entry) {
   if (!window.__chrgeFirebaseReady || !window.__chrgeFirestore) {
     throw new Error('firebase-unavailable');
   }
-  const { db, collection, getDocs, query, orderBy } = window.__chrgeFirestore;
-  const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const { db, collection, addDoc, serverTimestamp } = window.__chrgeFirestore;
+  await addDoc(collection(db, 'waitlist'), {
+    ...entry,
+    createdAt: serverTimestamp(),
+    source: 'landing_page'
+  });
 }
+
+// ============================================================
+// INLINE ICONS (no external icon package needed)
+// ============================================================
+const Icon = {
+  Zap: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill={p.fill||"none"} stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+  MapPin: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+  ScanLine: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/></svg>,
+  Wallet: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>,
+  ArrowRight: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+  Check: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+  Plus: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth={p.strokeWidth||2} strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+};
 
 // ============================================================
 // LOGO
@@ -186,215 +170,419 @@ function ChrgeLogo({ style = {}, fill = '#F4F4F2' }) {
   );
 }
 
-const fmtDate = (ts) => {
-  if (!ts) return '—';
-  try {
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return '—';
-  }
-};
+// ============================================================
+// SCROLL REVEAL HOOK
+// ============================================================
+function useReveal() {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.15 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, visible];
+}
 
-// Same technique used on the landing page's phone input: derive a
-// flag emoji from an ISO 3166-1 alpha-2 code at render time, rather
-// than storing/duplicating flag data here.
-const isoToFlagEmoji = (iso) => {
-  if (!iso || typeof iso !== 'string' || iso.length !== 2) return '';
-  return iso.toUpperCase().replace(/./g, ch => String.fromCodePoint(127397 + ch.charCodeAt(0)));
-};
-
-function StatCard({ label, value, icon: IconComp }) {
+function Reveal({ children, delay = 0, className = '' }) {
+  const [ref, visible] = useReveal();
   return (
-    <div style={{ background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderRadius: '14px', padding: '1.4rem 1.6rem', display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
-      <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: 'rgba(195,246,12,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <IconComp size={19} color="#C3F60C" />
-      </div>
-      <div>
-        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '1.5rem', color: '#F4F4F2', lineHeight: 1 }}>{value}</div>
-        <div style={{ color: '#9a9a96', fontSize: '0.8rem', marginTop: '0.2rem' }}>{label}</div>
-      </div>
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(24px)',
+        transition: `opacity 0.7s cubic-bezier(0.16,1,0.3,1) ${delay}ms, transform 0.7s cubic-bezier(0.16,1,0.3,1) ${delay}ms`
+      }}
+    >
+      {children}
     </div>
   );
 }
 
-function ChrgePlusAdmin() {
-  const [entries, setEntries] = useState([]);
-  const [status, setStatus] = useState('idle');
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
-
-  const load = useCallback(async () => {
-    setStatus('loading');
-    try {
-      const data = await fetchWaitlist();
-      setEntries(data);
-      setStatus('success');
-    } catch (e) {
-      setStatus('error');
-    }
+// ============================================================
+// BATTERY SCROLL INDICATOR (signature element)
+// ============================================================
+function ChargeProgress() {
+  const [pct, setPct] = useState(0);
+  useEffect(() => {
+    const onScroll = () => {
+      const h = document.documentElement;
+      const scrolled = h.scrollTop;
+      const height = h.scrollHeight - h.clientHeight;
+      setPct(height > 0 ? Math.min(100, Math.round((scrolled / height) * 100)) : 0);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  return (
+    <div style={{
+      position: 'fixed', top: 0, left: 0, right: 0, height: '3px',
+      background: 'rgba(244,244,242,0.08)', zIndex: 100
+    }}>
+      <div style={{
+        height: '100%', width: `${pct}%`,
+        background: '#C3F60C',
+        boxShadow: '0 0 12px rgba(195,246,12,0.6)',
+        transition: 'width 0.1s linear'
+      }} />
+    </div>
+  );
+}
 
-  const filtered = entries.filter(e => {
-    if (filter !== 'all' && e.role !== filter) return false;
-    if (search.trim()) {
-      const s = search.toLowerCase();
-      return (e.name || '').toLowerCase().includes(s) ||
-             (e.email || '').toLowerCase().includes(s) ||
-             (e.city || '').toLowerCase().includes(s) ||
-             (e.phone || '').toLowerCase().includes(s) ||
-             (e.venueName || '').toLowerCase().includes(s);
+// ============================================================
+// WAITLIST FORM
+// ============================================================
+const inputStyle = {
+  padding: '0.85rem 1rem',
+  borderRadius: '10px',
+  border: '1.5px solid rgba(244,244,242,0.12)',
+  background: 'rgba(244,244,242,0.03)',
+  color: '#F4F4F2',
+  fontFamily: "'Inter', sans-serif",
+  fontSize: '0.9rem',
+  outline: 'none'
+};
+
+function WaitlistForm() {
+  const [role, setRole] = useState('user');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [city, setCity] = useState('');
+  const [venueName, setVenueName] = useState('');
+  const [status, setStatus] = useState('idle');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setStatus('loading');
+    setErrorMsg('');
+    try {
+      await submitToWaitlist({
+        role,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        city: city.trim(),
+        venueName: role === 'venue' ? venueName.trim() : null
+      });
+      setStatus('success');
+    } catch (err) {
+      setStatus('error');
+      setErrorMsg("Firebase isn't connected yet — add your project config in the <script type=module> block near the top of this file to enable signups.");
     }
-    return true;
-  });
+  };
 
-  const userCount = entries.filter(e => e.role === 'user').length;
-  const venueCount = entries.filter(e => e.role === 'venue').length;
+  if (status === 'success') {
+    return (
+      <div style={{
+        background: 'rgba(195,246,12,0.08)', border: '1px solid rgba(195,246,12,0.35)',
+        borderRadius: '14px', padding: '2.2rem', textAlign: 'center'
+      }}>
+        <div style={{
+          width: '48px', height: '48px', borderRadius: '50%',
+          background: '#C3F60C', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 1rem'
+        }}>
+          <Icon.Check size={24} color="#0A0A0A" strokeWidth={3} />
+        </div>
+        <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '1.3rem', color: '#F4F4F2', marginBottom: '0.4rem' }}>
+          You're on the list.
+        </h3>
+        <p style={{ color: '#9a9a96', fontSize: '0.95rem' }}>
+          We'll email you the second CHRGE+ lands near you.
+        </p>
+      </div>
+    );
+  }
 
-  const exportCsv = () => {
-    const rows = [['Name', 'Email', 'Phone', 'Role', 'City', 'Venue', 'Joined']];
-    filtered.forEach(e => {
-      rows.push([e.name || '', e.email || '', e.phone || '', e.role || '', e.city || '', e.venueName || '', fmtDate(e.createdAt)]);
-    });
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'chrge-plus-waitlist.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+  return (
+    <form onSubmit={handleSubmit}>
+      <div style={{ display: 'flex', gap: '0.6rem', marginBottom: '1.4rem' }}>
+        {[
+          { id: 'user', label: 'I want to use CHRGE+' },
+          { id: 'venue', label: 'I have a venue' }
+        ].map(opt => (
+          <button
+            type="button" key={opt.id} onClick={() => setRole(opt.id)}
+            style={{
+              flex: 1, padding: '0.8rem 1rem', borderRadius: '10px',
+              border: role === opt.id ? '1.5px solid #C3F60C' : '1.5px solid rgba(244,244,242,0.14)',
+              background: role === opt.id ? 'rgba(195,246,12,0.1)' : 'transparent',
+              color: role === opt.id ? '#C3F60C' : '#9a9a96',
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.85rem',
+              cursor: 'pointer', transition: 'all 0.2s ease'
+            }}
+          >{opt.label}</button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
+        <input type="text" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
+        <input type="email" placeholder="Email address" required value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+        <input type="text" placeholder="City" value={city} onChange={e => setCity(e.target.value)} style={inputStyle} />
+        {role === 'venue' && (
+          <input type="text" placeholder="Venue name" value={venueName} onChange={e => setVenueName(e.target.value)} style={inputStyle} />
+        )}
+
+        <button
+          type="submit" disabled={status === 'loading'}
+          style={{
+            marginTop: '0.5rem', padding: '0.95rem 1.5rem', borderRadius: '10px', border: 'none',
+            background: '#C3F60C', color: '#0A0A0A',
+            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.95rem',
+            cursor: status === 'loading' ? 'default' : 'pointer',
+            opacity: status === 'loading' ? 0.7 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
+          }}
+        >
+          {status === 'loading' ? 'Joining...' : (role === 'venue' ? 'Apply as a venue' : 'Join the waitlist')}
+          {status !== 'loading' && <Icon.ArrowRight size={16} />}
+        </button>
+
+        {status === 'error' && (
+          <p style={{ color: '#ff8a8a', fontSize: '0.8rem', marginTop: '0.3rem' }}>{errorMsg}</p>
+        )}
+      </div>
+    </form>
+  );
+}
+
+// ============================================================
+// MAIN PAGE
+// ============================================================
+function ChrgePlusLanding() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener('scroll', onScroll);
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  const scrollToWaitlist = () => {
+    document.getElementById('waitlist')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
-    <div style={{ background: '#0A0A0A', minHeight: '100vh', fontFamily: "'Inter', sans-serif", color: '#F4F4F2', padding: '2.5rem 1.5rem' }}>
-      <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+    <div style={{ background: '#0A0A0A', minHeight: '100vh', fontFamily: "'Inter', sans-serif", color: '#F4F4F2', overflowX: 'hidden' }}>
+      <ChargeProgress />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-          <div>
-            <ChrgeLogo style={{ width: '110px', marginBottom: '0.6rem' }} />
-            <div style={{ color: '#9a9a96', fontSize: '0.85rem' }}>Waitlist dashboard</div>
-          </div>
-          <div style={{ display: 'flex', gap: '0.6rem' }}>
-            <button onClick={load} disabled={status === 'loading'} style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.1rem', borderRadius: '9px',
-              border: '1px solid rgba(244,244,242,0.14)', background: 'transparent', color: '#F4F4F2',
-              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.85rem',
-              cursor: status === 'loading' ? 'default' : 'pointer'
-            }}>
-              <Icon.RefreshCw size={15} style={{ animation: status === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
-              Refresh
-            </button>
-            <button onClick={exportCsv} disabled={filtered.length === 0} style={{
-              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.1rem', borderRadius: '9px', border: 'none',
-              background: '#C3F60C', color: '#0A0A0A',
-              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.85rem',
-              cursor: filtered.length === 0 ? 'default' : 'pointer',
-              opacity: filtered.length === 0 ? 0.5 : 1
-            }}>
-              <Icon.Download size={15} />
-              Export CSV
-            </button>
-          </div>
+      {/* NAV */}
+      <nav style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50,
+        padding: scrolled ? '1rem 0' : '1.5rem 0',
+        background: scrolled ? 'rgba(10,10,10,0.85)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(12px)' : 'none',
+        borderBottom: scrolled ? '1px solid rgba(244,244,242,0.08)' : '1px solid transparent',
+        transition: 'all 0.3s ease'
+      }}>
+        <div style={{ maxWidth: '1160px', margin: '0 auto', padding: '0 1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <ChrgeLogo style={{ width: '108px' }} />
+          <button onClick={scrollToWaitlist} style={{
+            padding: '0.6rem 1.3rem', borderRadius: '8px', border: '1px solid rgba(244,244,242,0.2)',
+            background: 'transparent', color: '#F4F4F2',
+            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer'
+          }}>Join waitlist</button>
         </div>
+      </nav>
 
-        {status === 'error' && (
-          <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'flex-start', background: 'rgba(255,138,138,0.08)', border: '1px solid rgba(255,138,138,0.3)', borderRadius: '12px', padding: '1.2rem 1.4rem', marginBottom: '1.6rem' }}>
-            <Icon.AlertCircle size={19} color="#ff8a8a" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.3rem' }}>Couldn't load the waitlist</div>
-              <div style={{ color: '#c9c9c5', fontSize: '0.83rem', lineHeight: 1.5 }}>
-                Either the Firebase config near the top of this file is still set to placeholder values, or your Firestore rules don't allow reads yet. See the setup notes in the HTML comments — you'll likely need to temporarily allow reads on the <code>waitlist</code> collection, or view signups directly in the Firebase Console instead.
+      {/* HERO */}
+      <section style={{ position: 'relative', minHeight: '100vh', display: 'flex', alignItems: 'center', padding: '7rem 1.5rem 4rem' }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'radial-gradient(ellipse 900px 600px at 75% 15%, rgba(195,246,12,0.10), transparent 60%), radial-gradient(ellipse 700px 500px at 10% 90%, rgba(195,246,12,0.06), transparent 60%)',
+          pointerEvents: 'none'
+        }} />
+
+        <div style={{ maxWidth: '1160px', margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '3rem', alignItems: 'center', position: 'relative', zIndex: 2 }} className="hero-grid">
+          <div>
+            <Reveal>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.9rem', borderRadius: '999px', border: '1px solid rgba(195,246,12,0.3)', background: 'rgba(195,246,12,0.06)', marginBottom: '1.6rem' }}>
+                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#C3F60C' }} />
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', color: '#C3F60C', textTransform: 'uppercase' }}>Now building in your city</span>
+              </div>
+            </Reveal>
+
+            <Reveal delay={80}>
+              <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 'clamp(2.4rem, 5vw, 3.8rem)', lineHeight: 1.06, letterSpacing: '-0.02em', marginBottom: '1.3rem' }}>
+                Never caught<br />slippin' <span style={{ color: '#C3F60C' }}>on empty.</span>
+              </h1>
+            </Reveal>
+
+            <Reveal delay={160}>
+              <p style={{ fontSize: '1.1rem', lineHeight: 1.6, color: '#9a9a96', maxWidth: '460px', marginBottom: '2.2rem' }}>
+                Grab a power bank at any CHRGE+ station, charge on the go, drop it at any other station. No cords, no waiting, no dead phone at the worst moment.
+              </p>
+            </Reveal>
+
+            <Reveal delay={240}>
+              <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                <button onClick={scrollToWaitlist} style={{
+                  padding: '1rem 1.8rem', borderRadius: '10px', border: 'none', background: '#C3F60C', color: '#0A0A0A',
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.95rem',
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem'
+                }}>Join the waitlist <Icon.ArrowRight size={17} /></button>
+                <a href="#how" style={{
+                  padding: '1rem 1.8rem', borderRadius: '10px', border: '1px solid rgba(244,244,242,0.18)',
+                  color: '#F4F4F2', textDecoration: 'none',
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.95rem', display: 'flex', alignItems: 'center'
+                }}>See how it works</a>
+              </div>
+            </Reveal>
+          </div>
+
+          <Reveal delay={200}>
+            <div style={{ position: 'relative', height: '440px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'absolute', width: '340px', height: '340px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(195,246,12,0.14) 0%, transparent 70%)' }} />
+              <div style={{
+                position: 'relative', width: '230px', height: '400px',
+                background: 'linear-gradient(155deg, #1a1a17 0%, #0d0d0b 100%)',
+                borderRadius: '28px', border: '1px solid rgba(244,244,242,0.1)',
+                boxShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(195,246,12,0.08)',
+                padding: '1.4rem', display: 'flex', flexDirection: 'column'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem' }}>
+                  <ChrgeLogo style={{ width: '64px' }} />
+                  <Icon.Zap size={16} color="#C3F60C" fill="#C3F60C" />
+                </div>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '0.9rem' }}>
+                  <div style={{ background: 'rgba(195,246,12,0.08)', border: '1px solid rgba(195,246,12,0.25)', borderRadius: '12px', padding: '0.9rem' }}>
+                    <div style={{ fontSize: '0.65rem', color: '#8a8a86', fontFamily: "'Space Grotesk', sans-serif", letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>Station 042</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#F4F4F2' }}>3 power banks ready</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.6rem 0' }}>
+                    <div style={{ width: '76px', height: '76px', borderRadius: '50%', background: '#C3F60C', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <Icon.Plus size={34} color="#0A0A0A" strokeWidth={3} />
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'center', fontSize: '0.8rem', color: '#9a9a96', fontFamily: "'Space Grotesk', sans-serif" }}>Tap to unlock</div>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.6rem', flexWrap: 'wrap' }}>
-          <StatCard label="Total signups" value={entries.length} icon={Icon.Users} />
-          <StatCard label="Users" value={userCount} icon={Icon.Users} />
-          <StatCard label="Venues" value={venueCount} icon={Icon.Store} />
+          </Reveal>
         </div>
+      </section>
 
-        <div style={{ display: 'flex', gap: '0.8rem', marginBottom: '1.2rem', flexWrap: 'wrap' }}>
-          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-            <Icon.Search size={15} color="#6b6b68" style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)' }} />
-            <input
-              type="text" placeholder="Search name, email, city..." value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{ width: '100%', padding: '0.7rem 1rem 0.7rem 2.4rem', borderRadius: '9px', border: '1px solid rgba(244,244,242,0.12)', background: 'rgba(244,244,242,0.03)', color: '#F4F4F2', fontSize: '0.85rem', outline: 'none' }}
-            />
+      {/* HOW IT WORKS */}
+      <section id="how" style={{ padding: '6rem 1.5rem', maxWidth: '1160px', margin: '0 auto' }}>
+        <Reveal>
+          <div style={{ marginBottom: '3rem', maxWidth: '520px' }}>
+            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.78rem', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C3F60C', marginBottom: '0.8rem' }}>How it works</div>
+            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 'clamp(1.7rem, 3vw, 2.3rem)', lineHeight: 1.15 }}>Charging shouldn't need a plan.</h2>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {['all', 'user', 'venue'].map(f => (
-              <button key={f} onClick={() => setFilter(f)} style={{
-                padding: '0.7rem 1.1rem', borderRadius: '9px',
-                border: filter === f ? '1px solid #C3F60C' : '1px solid rgba(244,244,242,0.12)',
-                background: filter === f ? 'rgba(195,246,12,0.08)' : 'transparent',
-                color: filter === f ? '#C3F60C' : '#9a9a96',
-                fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.8rem',
-                cursor: 'pointer', textTransform: 'capitalize'
-              }}>{f}</button>
-            ))}
-          </div>
+        </Reveal>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.4rem' }} className="how-grid">
+          {[
+            { icon: Icon.MapPin, title: 'Find a station', desc: 'Open the app, see every CHRGE+ station near you in real time — cafes, malls, gyms, wherever you already are.' },
+            { icon: Icon.ScanLine, title: 'Scan and go', desc: "Tap to unlock a fully-charged power bank. No deposit drama, no app-store dead ends. Just scan." },
+            { icon: Icon.Wallet, title: 'Return anywhere', desc: "Drop it back at any station in the network when you're done — not just the one you took it from." }
+          ].map((step, i) => (
+            <Reveal key={i} delay={i * 100}>
+              <div style={{ background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderRadius: '16px', padding: '2rem 1.6rem', height: '100%' }}>
+                <div style={{ width: '44px', height: '44px', borderRadius: '11px', background: 'rgba(195,246,12,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.3rem' }}>
+                  <step.icon size={21} color="#C3F60C" />
+                </div>
+                <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '1.15rem', marginBottom: '0.5rem' }}>{step.title}</h3>
+                <p style={{ color: '#9a9a96', fontSize: '0.92rem', lineHeight: 1.55 }}>{step.desc}</p>
+              </div>
+            </Reveal>
+          ))}
         </div>
+      </section>
 
-        <div style={{ background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderRadius: '14px', overflow: 'hidden' }}>
-          {status === 'loading' && entries.length === 0 ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#6b6b68' }}>Loading signups…</div>
-          ) : filtered.length === 0 && status !== 'error' ? (
-            <div style={{ padding: '3rem', textAlign: 'center', color: '#6b6b68' }}>No signups {search || filter !== 'all' ? 'match this filter' : 'yet'}.</div>
-          ) : status === 'error' ? null : (
-            <div style={{ overflowX: 'auto' }}>
-              <table>
-                <thead>
-                  <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>City</th><th>Venue</th><th>Joined</th></tr>
-                </thead>
-                <tbody>
-                  {filtered.map(e => (
-                    <tr key={e.id}>
-                      <td style={{ fontWeight: 500 }}>{e.name || '—'}</td>
-                      <td style={{ color: '#c9c9c5' }}>{e.email}</td>
-                      <td style={{ color: '#9a9a96' }}>
-                        {e.phone ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-                            {e.phoneCountry && <span>{isoToFlagEmoji(e.phoneCountry)}</span>}
-                            <span>{e.phone}</span>
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td>
-                        <span style={{
-                          padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.72rem',
-                          fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600,
-                          background: e.role === 'venue' ? 'rgba(195,246,12,0.12)' : 'rgba(244,244,242,0.08)',
-                          color: e.role === 'venue' ? '#C3F60C' : '#c9c9c5'
-                        }}>{e.role || 'user'}</span>
-                      </td>
-                      <td style={{ color: '#9a9a96' }}>{e.city || '—'}</td>
-                      <td style={{ color: '#9a9a96' }}>{e.venueName || '—'}</td>
-                      <td style={{ color: '#6b6b68', fontSize: '0.8rem' }}>{fmtDate(e.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {/* VENUE / PROOF BAND */}
+      <section style={{ background: '#F4F4F2', padding: '5rem 1.5rem' }}>
+        <div style={{ maxWidth: '1160px', margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3rem', alignItems: 'center' }} className="venue-grid">
+          <Reveal>
+            <div>
+              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.78rem', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#7a9b00', marginBottom: '0.8rem' }}>For venues</div>
+              <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 'clamp(1.6rem, 3vw, 2.1rem)', color: '#0A0A0A', lineHeight: 1.18, marginBottom: '1rem' }}>Run a cafe, bar, gym, or lounge? Host a station for free.</h2>
+              <p style={{ color: '#5a5a56', fontSize: '1rem', lineHeight: 1.6, marginBottom: '1.6rem', maxWidth: '440px' }}>Zero cost to install, zero upkeep on your end — and you earn a cut of every rental made at your location.</p>
+              <button onClick={scrollToWaitlist} style={{
+                padding: '0.9rem 1.6rem', borderRadius: '10px', border: 'none', background: '#0A0A0A', color: '#C3F60C',
+                fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.9rem',
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '0.5rem'
+              }}>Apply as a venue <Icon.ArrowRight size={16} /></button>
             </div>
-          )}
+          </Reveal>
+          <Reveal delay={120}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              {[['$0', 'cost or upkeep to host a station'], ['24/7', 'stations charge people around the clock'], ['+1', 'amenity your customers remember you for']].map(([stat, label], i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1.1rem', background: '#FFFFFF', border: '1px solid rgba(10,10,10,0.08)', borderRadius: '12px', padding: '1.1rem 1.4rem' }}>
+                  <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '1.5rem', color: '#0A0A0A', minWidth: '64px' }}>{stat}</div>
+                  <div style={{ color: '#6b6b68', fontSize: '0.88rem' }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </Reveal>
         </div>
-      </div>
+      </section>
+
+      {/* PRODUCT TEASER */}
+      <section style={{ padding: '4.5rem 1.5rem', maxWidth: '1160px', margin: '0 auto' }}>
+        <Reveal>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.6rem', background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderLeft: '3px solid #C3F60C', borderRadius: '14px', padding: '1.8rem 2rem', flexWrap: 'wrap' }}>
+            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '2rem', color: '#C3F60C' }}>+1</div>
+            <div style={{ flex: 1, minWidth: '260px' }}>
+              <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '1.05rem', marginBottom: '0.3rem' }}>Also stocking chargers, cables & power banks</h3>
+              <p style={{ color: '#9a9a96', fontSize: '0.88rem', lineHeight: 1.5 }}>Own your gear instead of renting? The CHRGE+ shop is landing soon — quality-tested, no counterfeit cells.</p>
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* WAITLIST */}
+      <section id="waitlist" style={{ padding: '5rem 1.5rem 7rem' }}>
+        <div style={{ maxWidth: '480px', margin: '0 auto' }}>
+          <Reveal>
+            <div style={{ textAlign: 'center', marginBottom: '2.2rem' }}>
+              <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 'clamp(1.7rem, 3vw, 2.2rem)', marginBottom: '0.6rem' }}>
+                Charge right. <span style={{ color: '#C3F60C' }}>Get on the list.</span>
+              </h2>
+              <p style={{ color: '#9a9a96', fontSize: '0.95rem' }}>Be first to know when CHRGE+ lands in your city.</p>
+            </div>
+          </Reveal>
+          <Reveal delay={100}>
+            <div style={{ background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderRadius: '18px', padding: '2rem' }}>
+              <WaitlistForm />
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{ borderTop: '1px solid rgba(244,244,242,0.08)', padding: '2.5rem 1.5rem' }}>
+        <div style={{ maxWidth: '1160px', margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+          <ChrgeLogo style={{ width: '90px' }} fill="#6b6b68" />
+          <p style={{ color: '#6b6b68', fontSize: '0.8rem', fontFamily: "'Space Grotesk', sans-serif" }}>© 2026 CHRGE+. Power, wherever.</p>
+        </div>
+      </footer>
     </div>
   );
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<ChrgePlusAdmin />);
+root.render(<ChrgePlusLanding />);
 </script>
 
 <script>
-  // Manually transform the JSX source above using the CLASSIC runtime —
-  // see the matching comment in index.html for why this is necessary.
+  // Manually transform the JSX source above using the CLASSIC runtime
+  // (React.createElement calls), not Babel's automatic runtime — the
+  // automatic runtime compiles to `import { jsx } from "react/jsx-runtime"`,
+  // which is an ES module import statement a plain classic <script> tag
+  // cannot execute, and throws "Cannot use import statement outside a
+  // module." Using type="text/plain" above also stops Babel's automatic
+  // DOM-scanning from double-transforming this same source.
   const _source = document.getElementById('app-source').textContent;
   const _compiled = Babel.transform(_source, {
     presets: [['react', { runtime: 'classic' }]]

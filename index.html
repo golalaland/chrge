@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -30,11 +31,15 @@ FIREBASE SETUP
 ============================================================ -->
 
 <!-- React + ReactDOM + Babel (compiles JSX right in the browser) -->
+
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <!-- Firebase -->
+
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
   import { getFirestore, collection, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
@@ -80,7 +85,18 @@ FIREBASE SETUP
     .how-grid { grid-template-columns: 1fr !important; }
     .venue-grid { grid-template-columns: 1fr !important; }
   }
+  @keyframes chrgeCursorBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+  @keyframes chrgeConfettiFall {
+    0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--cx), var(--cy)) rotate(var(--cr)); opacity: 0; }
+  }
+  .chrge-slider-track { scroll-behavior: auto; }
+  .chrge-slider-track::-webkit-scrollbar { display: none; }
 </style>
+
 </head>
 <body>
 
@@ -241,6 +257,371 @@ function ChargeProgress() {
 }
 
 // ============================================================
+// TYPEWRITER (loops forever, initializes once, survives scroll)
+// ------------------------------------------------------------
+// Uses a ref (not state) to track typing phase/position so the
+// animation loop lives entirely inside one useEffect that runs
+// exactly once on mount ([] deps) — scrolling never re-triggers
+// it since this component never unmounts (Reveal only toggles
+// opacity/transform, it doesn't remove children from the DOM).
+// ============================================================
+function Typewriter({ messages, typingSpeed = 45, deletingSpeed = 25, pauseAfterType = 1400, pauseAfterDelete = 300 }) {
+  const [text, setText] = useState('');
+  const stateRef = useRef({ msgIndex: 0, charIndex: 0, phase: 'typing' });
+  const timeoutRef = useRef(null);
+
+  useEffect(() => {
+    function step() {
+      const s = stateRef.current;
+      const current = messages[s.msgIndex];
+
+      if (s.phase === 'typing') {
+        s.charIndex++;
+        setText(current.slice(0, s.charIndex));
+        if (s.charIndex >= current.length) {
+          s.phase = 'pausing';
+          timeoutRef.current = setTimeout(step, pauseAfterType);
+        } else {
+          timeoutRef.current = setTimeout(step, typingSpeed);
+        }
+        return;
+      }
+
+      if (s.phase === 'pausing') {
+        s.phase = 'deleting';
+        timeoutRef.current = setTimeout(step, deletingSpeed);
+        return;
+      }
+
+      if (s.phase === 'deleting') {
+        s.charIndex--;
+        setText(current.slice(0, Math.max(s.charIndex, 0)));
+        if (s.charIndex <= 0) {
+          s.msgIndex = (s.msgIndex + 1) % messages.length;
+          s.phase = 'pausingBeforeNext';
+          timeoutRef.current = setTimeout(step, pauseAfterDelete);
+        } else {
+          timeoutRef.current = setTimeout(step, deletingSpeed);
+        }
+        return;
+      }
+
+      if (s.phase === 'pausingBeforeNext') {
+        s.phase = 'typing';
+        timeoutRef.current = setTimeout(step, typingSpeed);
+        return;
+      }
+    }
+
+    timeoutRef.current = setTimeout(step, typingSpeed);
+    return () => clearTimeout(timeoutRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+      {text}
+      <span aria-hidden="true" style={{
+        display: 'inline-block', width: '2px', height: '0.9em', background: '#C3F60C',
+        marginLeft: '2px', animation: 'chrgeCursorBlink 0.8s step-end infinite'
+      }} />
+    </span>
+  );
+}
+
+const CHRGE_TYPEWRITER_MESSAGES = [
+  'Now building in your city.',
+  'Charging up something special.',
+  'Early members unlock exclusive perks.',
+  'The future starts with the first charge.'
+];
+
+// ============================================================
+// PHONE INPUT — country selector + searchable dropdown
+// ------------------------------------------------------------
+// Flags are generated from ISO 3166-1 alpha-2 codes at runtime
+// (regional indicator symbol technique) rather than hand-typed,
+// since that's far less error-prone across ~90 countries.
+// ============================================================
+function isoToFlagEmoji(iso) {
+  return iso.toUpperCase().replace(/./g, ch => String.fromCodePoint(127397 + ch.charCodeAt(0)));
+}
+
+const CHRGE_PINNED_COUNTRIES = [
+  { iso: 'NG', name: 'Nigeria', dial: '234' },
+  { iso: 'GH', name: 'Ghana', dial: '233' },
+  { iso: 'KE', name: 'Kenya', dial: '254' },
+  { iso: 'BJ', name: 'Benin Republic', dial: '229' }
+];
+
+const CHRGE_OTHER_COUNTRIES = [
+  { iso: 'US', name: 'United States', dial: '1' },
+  { iso: 'CA', name: 'Canada', dial: '1' },
+  { iso: 'GB', name: 'United Kingdom', dial: '44' },
+  { iso: 'IE', name: 'Ireland', dial: '353' },
+  { iso: 'FR', name: 'France', dial: '33' },
+  { iso: 'DE', name: 'Germany', dial: '49' },
+  { iso: 'ES', name: 'Spain', dial: '34' },
+  { iso: 'PT', name: 'Portugal', dial: '351' },
+  { iso: 'IT', name: 'Italy', dial: '39' },
+  { iso: 'NL', name: 'Netherlands', dial: '31' },
+  { iso: 'BE', name: 'Belgium', dial: '32' },
+  { iso: 'CH', name: 'Switzerland', dial: '41' },
+  { iso: 'AT', name: 'Austria', dial: '43' },
+  { iso: 'SE', name: 'Sweden', dial: '46' },
+  { iso: 'NO', name: 'Norway', dial: '47' },
+  { iso: 'DK', name: 'Denmark', dial: '45' },
+  { iso: 'FI', name: 'Finland', dial: '358' },
+  { iso: 'PL', name: 'Poland', dial: '48' },
+  { iso: 'GR', name: 'Greece', dial: '30' },
+  { iso: 'TR', name: 'Turkey', dial: '90' },
+  { iso: 'RU', name: 'Russia', dial: '7' },
+  { iso: 'UA', name: 'Ukraine', dial: '380' },
+  { iso: 'ZA', name: 'South Africa', dial: '27' },
+  { iso: 'EG', name: 'Egypt', dial: '20' },
+  { iso: 'MA', name: 'Morocco', dial: '212' },
+  { iso: 'DZ', name: 'Algeria', dial: '213' },
+  { iso: 'TN', name: 'Tunisia', dial: '216' },
+  { iso: 'LY', name: 'Libya', dial: '218' },
+  { iso: 'ET', name: 'Ethiopia', dial: '251' },
+  { iso: 'TZ', name: 'Tanzania', dial: '255' },
+  { iso: 'UG', name: 'Uganda', dial: '256' },
+  { iso: 'RW', name: 'Rwanda', dial: '250' },
+  { iso: 'SN', name: 'Senegal', dial: '221' },
+  { iso: 'CI', name: "Cote d'Ivoire", dial: '225' },
+  { iso: 'CM', name: 'Cameroon', dial: '237' },
+  { iso: 'TG', name: 'Togo', dial: '228' },
+  { iso: 'SL', name: 'Sierra Leone', dial: '232' },
+  { iso: 'LR', name: 'Liberia', dial: '231' },
+  { iso: 'ML', name: 'Mali', dial: '223' },
+  { iso: 'NE', name: 'Niger', dial: '227' },
+  { iso: 'BF', name: 'Burkina Faso', dial: '226' },
+  { iso: 'GM', name: 'Gambia', dial: '220' },
+  { iso: 'GN', name: 'Guinea', dial: '224' },
+  { iso: 'ZM', name: 'Zambia', dial: '260' },
+  { iso: 'ZW', name: 'Zimbabwe', dial: '263' },
+  { iso: 'MZ', name: 'Mozambique', dial: '258' },
+  { iso: 'AO', name: 'Angola', dial: '244' },
+  { iso: 'NA', name: 'Namibia', dial: '264' },
+  { iso: 'BW', name: 'Botswana', dial: '267' },
+  { iso: 'MW', name: 'Malawi', dial: '265' },
+  { iso: 'SD', name: 'Sudan', dial: '249' },
+  { iso: 'SS', name: 'South Sudan', dial: '211' },
+  { iso: 'IN', name: 'India', dial: '91' },
+  { iso: 'PK', name: 'Pakistan', dial: '92' },
+  { iso: 'BD', name: 'Bangladesh', dial: '880' },
+  { iso: 'LK', name: 'Sri Lanka', dial: '94' },
+  { iso: 'NP', name: 'Nepal', dial: '977' },
+  { iso: 'CN', name: 'China', dial: '86' },
+  { iso: 'JP', name: 'Japan', dial: '81' },
+  { iso: 'KR', name: 'South Korea', dial: '82' },
+  { iso: 'HK', name: 'Hong Kong', dial: '852' },
+  { iso: 'SG', name: 'Singapore', dial: '65' },
+  { iso: 'MY', name: 'Malaysia', dial: '60' },
+  { iso: 'TH', name: 'Thailand', dial: '66' },
+  { iso: 'VN', name: 'Vietnam', dial: '84' },
+  { iso: 'PH', name: 'Philippines', dial: '63' },
+  { iso: 'ID', name: 'Indonesia', dial: '62' },
+  { iso: 'AE', name: 'United Arab Emirates', dial: '971' },
+  { iso: 'SA', name: 'Saudi Arabia', dial: '966' },
+  { iso: 'QA', name: 'Qatar', dial: '974' },
+  { iso: 'KW', name: 'Kuwait', dial: '965' },
+  { iso: 'IL', name: 'Israel', dial: '972' },
+  { iso: 'JO', name: 'Jordan', dial: '962' },
+  { iso: 'LB', name: 'Lebanon', dial: '961' },
+  { iso: 'AU', name: 'Australia', dial: '61' },
+  { iso: 'NZ', name: 'New Zealand', dial: '64' },
+  { iso: 'BR', name: 'Brazil', dial: '55' },
+  { iso: 'MX', name: 'Mexico', dial: '52' },
+  { iso: 'AR', name: 'Argentina', dial: '54' },
+  { iso: 'CO', name: 'Colombia', dial: '57' },
+  { iso: 'CL', name: 'Chile', dial: '56' },
+  { iso: 'PE', name: 'Peru', dial: '51' },
+  { iso: 'JM', name: 'Jamaica', dial: '1876' },
+  { iso: 'TT', name: 'Trinidad and Tobago', dial: '1868' }
+];
+
+const CHRGE_ALL_COUNTRIES = [...CHRGE_PINNED_COUNTRIES, ...CHRGE_OTHER_COUNTRIES];
+
+function PhoneInput({ value, onChange, country, onCountryChange }) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const wrapRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  useEffect(() => {
+    function handleOutsideClick(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+        setSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    if (open && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [open]);
+
+  const filteredOthers = CHRGE_OTHER_COUNTRIES.filter(c => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return c.name.toLowerCase().includes(q) || c.dial.includes(q);
+  });
+  const filteredPinned = CHRGE_PINNED_COUNTRIES.filter(c => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return c.name.toLowerCase().includes(q) || c.dial.includes(q);
+  });
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', display: 'flex', gap: '0.5rem' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          ...inputStyle,
+          display: 'flex', alignItems: 'center', gap: '0.4rem',
+          width: 'auto', flexShrink: 0, cursor: 'pointer', whiteSpace: 'nowrap'
+        }}
+      >
+        <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>{isoToFlagEmoji(country.iso)}</span>
+        <span style={{ fontSize: '0.85rem', color: '#F4F4F2' }}>+{country.dial}</span>
+        <span style={{ fontSize: '0.65rem', color: '#6b6b68' }}>▾</span>
+      </button>
+
+      <input
+        type="tel"
+        inputMode="tel"
+        placeholder="Phone number"
+        value={value}
+        onChange={e => onChange(e.target.value.replace(/[^\d\s-]/g, ''))}
+        style={{ ...inputStyle, flex: 1 }}
+      />
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+          width: '280px', maxHeight: '320px', overflowY: 'auto',
+          background: '#1a1a17', border: '1.5px solid rgba(244,244,242,0.14)',
+          borderRadius: '12px', boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+          zIndex: 60
+        }}>
+          <div style={{ padding: '0.6rem', borderBottom: '1px solid rgba(244,244,242,0.08)', position: 'sticky', top: 0, background: '#1a1a17' }}>
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search countries..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ ...inputStyle, padding: '0.55rem 0.7rem', fontSize: '0.85rem' }}
+            />
+          </div>
+
+          {filteredPinned.length > 0 && (
+            <div>
+              {filteredPinned.map(c => (
+                <button
+                  key={c.iso} type="button"
+                  onClick={() => { onCountryChange(c); setOpen(false); setSearch(''); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%',
+                    padding: '0.6rem 0.8rem', background: 'transparent', border: 'none',
+                    color: '#F4F4F2', fontSize: '0.85rem', textAlign: 'left', cursor: 'pointer'
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(195,246,12,0.08)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                  <span style={{ fontSize: '1.05rem' }}>{isoToFlagEmoji(c.iso)}</span>
+                  <span style={{ flex: 1 }}>{c.name}</span>
+                  <span style={{ color: '#6b6b68' }}>+{c.dial}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {filteredPinned.length > 0 && filteredOthers.length > 0 && (
+            <div style={{ padding: '0.5rem 0.8rem', fontSize: '0.68rem', letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b6b68', fontFamily: "'Space Grotesk', sans-serif", borderTop: '1px solid rgba(244,244,242,0.08)', borderBottom: '1px solid rgba(244,244,242,0.08)' }}>
+              Rest of World 🌍
+            </div>
+          )}
+
+          {filteredOthers.map(c => (
+            <button
+              key={c.iso} type="button"
+              onClick={() => { onCountryChange(c); setOpen(false); setSearch(''); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.6rem', width: '100%',
+                padding: '0.6rem 0.8rem', background: 'transparent', border: 'none',
+                color: '#F4F4F2', fontSize: '0.85rem', textAlign: 'left', cursor: 'pointer'
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(195,246,12,0.08)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <span style={{ fontSize: '1.05rem' }}>{isoToFlagEmoji(c.iso)}</span>
+              <span style={{ flex: 1 }}>{c.name}</span>
+              <span style={{ color: '#6b6b68' }}>+{c.dial}</span>
+            </button>
+          ))}
+
+          {filteredPinned.length === 0 && filteredOthers.length === 0 && (
+            <div style={{ padding: '1rem', textAlign: 'center', color: '#6b6b68', fontSize: '0.82rem' }}>No countries match.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// CONFETTI — tasteful ~1s burst on waitlist success
+// ------------------------------------------------------------
+// Plain DOM elements (not canvas) animated via the
+// chrgeConfettiFall keyframe defined in <style>. Contained
+// within the success box itself (overflow:hidden host) rather
+// than full-screen, keeping it a quick accent rather than a
+// party effect.
+// ============================================================
+function fireChrgeConfetti(hostEl) {
+  if (!hostEl) return;
+  const colors = ['#C3F60C', '#e8ff8a', '#F4F4F2'];
+  const count = 22;
+  const originX = hostEl.clientWidth / 2;
+  const originY = 44;
+
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('span');
+    const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.5 - 0.25);
+    const distance = 55 + Math.random() * 85;
+    const cx = Math.cos(angle) * distance;
+    const cy = Math.sin(angle) * distance - 15;
+    const size = 4 + Math.random() * 5;
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    const rotation = Math.round(Math.random() * 360);
+
+    el.style.position = 'absolute';
+    el.style.left = originX + 'px';
+    el.style.top = originY + 'px';
+    el.style.width = size + 'px';
+    el.style.height = (size * (Math.random() > 0.5 ? 1 : 2.2)) + 'px';
+    el.style.background = color;
+    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    el.style.setProperty('--cx', cx + 'px');
+    el.style.setProperty('--cy', cy + 'px');
+    el.style.setProperty('--cr', rotation + 'deg');
+    el.style.animation = `chrgeConfettiFall ${0.7 + Math.random() * 0.4}s ease-out forwards`;
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '1';
+
+    hostEl.appendChild(el);
+    setTimeout(() => { if (el.parentNode) el.remove(); }, 1300);
+  }
+}
+
+// ============================================================
 // WAITLIST FORM
 // ============================================================
 const inputStyle = {
@@ -260,8 +641,11 @@ function WaitlistForm() {
   const [email, setEmail] = useState('');
   const [city, setCity] = useState('');
   const [venueName, setVenueName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [country, setCountry] = useState(CHRGE_PINNED_COUNTRIES[0]);
   const [status, setStatus] = useState('idle');
   const [errorMsg, setErrorMsg] = useState('');
+  const confettiHostRef = useRef(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -274,9 +658,12 @@ function WaitlistForm() {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         city: city.trim(),
-        venueName: role === 'venue' ? venueName.trim() : null
+        venueName: role === 'venue' ? venueName.trim() : null,
+        phone: phone.trim() ? `+${country.dial}${phone.trim().replace(/\s|-/g, '')}` : null,
+        phoneCountry: phone.trim() ? country.iso : null
       });
       setStatus('success');
+      fireChrgeConfetti(confettiHostRef.current);
     } catch (err) {
       setStatus('error');
       setErrorMsg("Firebase isn't connected yet — add your project config in the <script type=module> block near the top of this file to enable signups.");
@@ -285,21 +672,22 @@ function WaitlistForm() {
 
   if (status === 'success') {
     return (
-      <div style={{
+      <div ref={confettiHostRef} style={{
+        position: 'relative', overflow: 'hidden',
         background: 'rgba(195,246,12,0.08)', border: '1px solid rgba(195,246,12,0.35)',
         borderRadius: '14px', padding: '2.2rem', textAlign: 'center'
       }}>
         <div style={{
           width: '48px', height: '48px', borderRadius: '50%',
           background: '#C3F60C', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          margin: '0 auto 1rem'
+          margin: '0 auto 1rem', position: 'relative', zIndex: 2
         }}>
           <Icon.Check size={24} color="#0A0A0A" strokeWidth={3} />
         </div>
-        <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '1.3rem', color: '#F4F4F2', marginBottom: '0.4rem' }}>
+        <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '1.3rem', color: '#F4F4F2', marginBottom: '0.4rem', position: 'relative', zIndex: 2 }}>
           You're on the list.
         </h3>
-        <p style={{ color: '#9a9a96', fontSize: '0.95rem' }}>
+        <p style={{ color: '#9a9a96', fontSize: '0.95rem', position: 'relative', zIndex: 2 }}>
           We'll email you the second CHRGE+ lands near you.
         </p>
       </div>
@@ -330,6 +718,7 @@ function WaitlistForm() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
         <input type="text" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} style={inputStyle} />
         <input type="email" placeholder="Email address" required value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+        <PhoneInput value={phone} onChange={setPhone} country={country} onCountryChange={setCountry} />
         <input type="text" placeholder="City" value={city} onChange={e => setCity(e.target.value)} style={inputStyle} />
         {role === 'venue' && (
           <input type="text" placeholder="Venue name" value={venueName} onChange={e => setVenueName(e.target.value)} style={inputStyle} />
@@ -361,6 +750,171 @@ function WaitlistForm() {
 // ============================================================
 // MAIN PAGE
 // ============================================================
+// ============================================================
+// PRODUCT SLIDER
+// ------------------------------------------------------------
+// Infinite loop via the classic "clone edges" technique: real
+// slides are padded with a clone of the last slide at the start
+// and a clone of the first slide at the end, so sliding past
+// either edge always has something to slide INTO — then once
+// the transition finishes, we jump (without a transition) back
+// to the real slide at the same visual position, invisibly.
+//
+// Placeholder slides below use the existing brand icon/gradient
+// system rather than stock photography — swap `image: '...'` in
+// with a real URL and this already applies loading="lazy".
+// ============================================================
+const CHRGE_PRODUCT_SLIDES = [
+  { title: 'CHRGE+ 10,000mAh', subtitle: 'Slim power bank, USB-C + Lightning', icon: 'Zap', image: null },
+  { title: 'CHRGE+ Fast Cable', subtitle: 'Braided, 100W, USB-C to USB-C', icon: 'Zap', image: null },
+  { title: 'CHRGE+ Wall Charger', subtitle: '65W GaN, dual port', icon: 'Zap', image: null },
+  { title: 'CHRGE+ Station', subtitle: 'The kiosk itself, in the wild', icon: 'MapPin', image: null },
+  { title: 'CHRGE+ Car Mount', subtitle: 'Wireless charge, magnetic lock', icon: 'Zap', image: null }
+];
+
+function ProductSlider() {
+  const slides = CHRGE_PRODUCT_SLIDES;
+  const extended = [slides[slides.length - 1], ...slides, slides[0]];
+  const [index, setIndex] = useState(1);
+  const [withTransition, setWithTransition] = useState(true);
+  const [paused, setPaused] = useState(false);
+  const dragState = useRef({ dragging: false, startX: 0, deltaX: 0 });
+  const [dragOffsetPx, setDragOffsetPx] = useState(0);
+  const trackRef = useRef(null);
+  const containerRef = useRef(null);
+  const autoplayRef = useRef(null);
+
+  const goTo = (newIndex, transition = true) => {
+    setWithTransition(transition);
+    setIndex(newIndex);
+  };
+
+  useEffect(() => {
+    if (paused) return;
+    autoplayRef.current = setInterval(() => {
+      setDragOffsetPx(0);
+      goTo(index + 1, true);
+    }, 4200);
+    return () => clearInterval(autoplayRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, paused]);
+
+  const handleTransitionEnd = () => {
+    if (index === extended.length - 1) {
+      goTo(1, false);
+    } else if (index === 0) {
+      goTo(extended.length - 2, false);
+    }
+  };
+
+  const onPointerDown = (e) => {
+    dragState.current = { dragging: true, startX: e.clientX, deltaX: 0 };
+    setPaused(true);
+    if (containerRef.current) containerRef.current.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e) => {
+    if (!dragState.current.dragging) return;
+    dragState.current.deltaX = e.clientX - dragState.current.startX;
+    setDragOffsetPx(dragState.current.deltaX);
+  };
+  const onPointerUp = () => {
+    if (!dragState.current.dragging) return;
+    const delta = dragState.current.deltaX;
+    const threshold = 60;
+    setDragOffsetPx(0);
+    if (delta > threshold) {
+      goTo(index - 1, true);
+    } else if (delta < -threshold) {
+      goTo(index + 1, true);
+    } else {
+      setWithTransition(true);
+    }
+    dragState.current = { dragging: false, startX: 0, deltaX: 0 };
+    setPaused(false);
+  };
+
+  const baseTranslate = -index * 100;
+  const dragPct = containerRef.current && containerRef.current.clientWidth
+    ? (dragOffsetPx / containerRef.current.clientWidth) * 100
+    : 0;
+
+  return (
+    <div
+      ref={containerRef}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+      style={{ position: 'relative', overflow: 'hidden', borderRadius: '18px', touchAction: 'pan-y', cursor: 'grab', userSelect: 'none' }}
+    >
+      <div
+        ref={trackRef}
+        className="chrge-slider-track"
+        onTransitionEnd={handleTransitionEnd}
+        style={{
+          display: 'flex',
+          transform: `translateX(calc(${baseTranslate}% + ${dragPct}%))`,
+          transition: withTransition ? 'transform 0.5s cubic-bezier(0.65,0,0.35,1)' : 'none'
+        }}
+      >
+        {extended.map((slide, i) => (
+          <div key={i} style={{ flex: '0 0 100%', maxWidth: '100%' }}>
+            <div style={{
+              margin: '0 0.5rem',
+              background: 'linear-gradient(155deg, #1a1a17 0%, #0d0d0b 100%)',
+              border: '1px solid rgba(244,244,242,0.08)',
+              borderRadius: '16px',
+              aspectRatio: '16 / 9',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: '1rem', padding: '2rem'
+            }}>
+              {slide.image ? (
+                <img src={slide.image} alt={slide.title} loading="lazy" draggable="false"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+              ) : (
+                <>
+                  <div style={{
+                    width: '56px', height: '56px', borderRadius: '14px',
+                    background: 'rgba(195,246,12,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    {Icon[slide.icon] ? Icon[slide.icon]({ size: 26, color: '#C3F60C' }) : null}
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '1.05rem', color: '#F4F4F2', marginBottom: '0.3rem' }}>{slide.title}</div>
+                    <div style={{ fontSize: '0.82rem', color: '#6b6b68' }}>{slide.subtitle}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem', marginTop: '1rem' }}>
+        {slides.map((_, i) => {
+          const realIndex = i + 1;
+          const isActive = index === realIndex || (index === 0 && i === slides.length - 1) || (index === extended.length - 1 && i === 0);
+          return (
+            <button
+              key={i}
+              type="button"
+              aria-label={`Go to slide ${i + 1}`}
+              onClick={() => { setDragOffsetPx(0); goTo(realIndex, true); }}
+              style={{
+                width: isActive ? '18px' : '6px', height: '6px', borderRadius: '999px',
+                background: isActive ? '#C3F60C' : 'rgba(244,244,242,0.2)',
+                border: 'none', cursor: 'pointer', transition: 'all 0.25s ease', padding: 0
+              }}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ChrgePlusLanding() {
   const [scrolled, setScrolled] = useState(false);
 
@@ -408,9 +962,10 @@ function ChrgePlusLanding() {
         <div style={{ maxWidth: '1160px', margin: '0 auto', width: '100%', display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: '3rem', alignItems: 'center', position: 'relative', zIndex: 2 }} className="hero-grid">
           <div>
             <Reveal>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.9rem', borderRadius: '999px', border: '1px solid rgba(195,246,12,0.3)', background: 'rgba(195,246,12,0.06)', marginBottom: '1.6rem' }}>
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#C3F60C' }} />
-                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', color: '#C3F60C', textTransform: 'uppercase' }}>Now building in your city</span>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.9rem', borderRadius: '999px', border: '1px solid rgba(195,246,12,0.3)', background: 'rgba(195,246,12,0.06)', marginBottom: '1.6rem', minHeight: '1.6rem' }}>
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.08em', color: '#C3F60C', textTransform: 'uppercase' }}>
+                  <Typewriter messages={CHRGE_TYPEWRITER_MESSAGES} />
+                </span>
               </div>
             </Reveal>
 
@@ -500,6 +1055,19 @@ function ChrgePlusLanding() {
             </Reveal>
           ))}
         </div>
+      </section>
+
+      {/* PRODUCT PREVIEW SLIDER */}
+      <section style={{ padding: '2rem 1.5rem 6rem', maxWidth: '1160px', margin: '0 auto' }}>
+        <Reveal>
+          <div style={{ marginBottom: '2rem', maxWidth: '520px' }}>
+            <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: '0.78rem', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#C3F60C', marginBottom: '0.8rem' }}>What's coming</div>
+            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 'clamp(1.7rem, 3vw, 2.3rem)', lineHeight: 1.15 }}>A first look at the lineup.</h2>
+          </div>
+        </Reveal>
+        <Reveal delay={100}>
+          <ProductSlider />
+        </Reveal>
       </section>
 
       {/* VENUE / PROOF BAND */}

@@ -35,20 +35,21 @@ FIREBASE SETUP
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <!-- Firebase -->
-<script type="module">import {
-  initializeFirestore,
-  getFirestore,
-  persistentLocalCache,
-  persistentMultipleTabManager,
-  collection,
-  addDoc,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
-   
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
+  import {
+    initializeFirestore,
+    getFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager,
+    collection,
+    addDoc,
+    serverTimestamp
+  } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
   // ============================================================
   // PASTE YOUR FIREBASE CONFIG HERE (from the Firebase Console)
   // ============================================================
-  /* ── Firebase Configuration ── */
   const firebaseConfig = {
     apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
     authDomain: "dettyverse.firebaseapp.com",
@@ -60,33 +61,32 @@ FIREBASE SETUP
   };
 
   try {
-   const app = initializeApp(firebaseConfig);
+    const app = initializeApp(firebaseConfig);
 
-let db;
+    let db;
+    try {
+      db = initializeFirestore(
+        app,
+        {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager()
+          })
+        },
+        "chrge"
+      );
+      console.log("📦 Firestore Database: chrge");
+    } catch (err) {
+      console.warn("[FIRESTORE] Persistent cache unavailable. Falling back.", err);
+      db = getFirestore(app, "chrge");
+    }
 
-try {
-  db = initializeFirestore(
-    app,
-    {
-      localCache: persistentLocalCache({
-        tabManager: persistentMultipleTabManager()
-      })
-    },
-    "chrge"
-  );
-} catch (err) {
-  console.warn("Persistent cache unavailable:", err);
-  db = getFirestore(app, "chrge");
-}
-
-window.__chrgeFirestore = {
-  db,
-  collection,
-  addDoc,
-  serverTimestamp
-};
-
-window.__chrgeFirebaseReady = true;
+    window.__chrgeFirestore = { db, collection, addDoc, serverTimestamp };
+    window.__chrgeFirebaseReady = true;
+    console.log("✅ Firebase ready, targeting chrge database");
+  } catch (e) {
+    console.error("❌ Firebase initialization failed:", e);
+    window.__chrgeFirebaseReady = false;
+  }
 </script>
 
 <style>
@@ -277,12 +277,6 @@ function ChargeProgress() {
 
 // ============================================================
 // TYPEWRITER (loops forever, initializes once, survives scroll)
-// ------------------------------------------------------------
-// Uses a ref (not state) to track typing phase/position so the
-// animation loop lives entirely inside one useEffect that runs
-// exactly once on mount ([] deps) — scrolling never re-triggers
-// it since this component never unmounts (Reveal only toggles
-// opacity/transform, it doesn't remove children from the DOM).
 // ============================================================
 function Typewriter({ messages, typingSpeed = 45, deletingSpeed = 25, pauseAfterType = 1400, pauseAfterDelete = 300 }) {
   const [text, setText] = useState('');
@@ -357,10 +351,6 @@ const CHRGE_TYPEWRITER_MESSAGES = [
 
 // ============================================================
 // PHONE INPUT — country selector + searchable dropdown
-// ------------------------------------------------------------
-// Flags are generated from ISO 3166-1 alpha-2 codes at runtime
-// (regional indicator symbol technique) rather than hand-typed,
-// since that's far less error-prone across ~90 countries.
 // ============================================================
 function isoToFlagEmoji(iso) {
   return iso.toUpperCase().replace(/./g, ch => String.fromCodePoint(127397 + ch.charCodeAt(0)));
@@ -601,12 +591,6 @@ function PhoneInput({ value, onChange, country, onCountryChange }) {
 
 // ============================================================
 // CONFETTI — tasteful ~1s burst on waitlist success
-// ------------------------------------------------------------
-// Plain DOM elements (not canvas) animated via the
-// chrgeConfettiFall keyframe defined in <style>. Contained
-// within the success box itself (overflow:hidden host) rather
-// than full-screen, keeping it a quick accent rather than a
-// party effect.
 // ============================================================
 function fireChrgeConfetti(hostEl) {
   if (!hostEl) return;
@@ -689,7 +673,7 @@ function WaitlistForm() {
       fireChrgeConfetti(confettiHostRef.current);
     } catch (err) {
       setStatus('error');
-      setErrorMsg("Firebase isn't connected yet — add your project config in the <script type=module> block near the top of this file to enable signups.");
+      setErrorMsg("Firebase isn't connected yet — check the browser console for the exact error.");
     }
   };
 
@@ -771,21 +755,7 @@ function WaitlistForm() {
 }
 
 // ============================================================
-// MAIN PAGE
-// ============================================================
-// ============================================================
 // PRODUCT SLIDER
-// ------------------------------------------------------------
-// Infinite loop via the classic "clone edges" technique: real
-// slides are padded with a clone of the last slide at the start
-// and a clone of the first slide at the end, so sliding past
-// either edge always has something to slide INTO — then once
-// the transition finishes, we jump (without a transition) back
-// to the real slide at the same visual position, invisibly.
-//
-// Placeholder slides below use the existing brand icon/gradient
-// system rather than stock photography — swap `image: '...'` in
-// with a real URL and this already applies loading="lazy".
 // ============================================================
 const CHRGE_PRODUCT_SLIDES = [
   { title: 'CHRGE+ 10,000mAh', subtitle: 'Slim power bank, USB-C + Lightning', icon: 'Zap', image: null },
@@ -938,6 +908,9 @@ function ProductSlider() {
   );
 }
 
+// ============================================================
+// MAIN PAGE
+// ============================================================
 function ChrgePlusLanding() {
   const [scrolled, setScrolled] = useState(false);
 
@@ -1169,13 +1142,6 @@ root.render(<ChrgePlusLanding />);
 </script>
 
 <script>
-  // Manually transform the JSX source above using the CLASSIC runtime
-  // (React.createElement calls), not Babel's automatic runtime — the
-  // automatic runtime compiles to `import { jsx } from "react/jsx-runtime"`,
-  // which is an ES module import statement a plain classic <script> tag
-  // cannot execute, and throws "Cannot use import statement outside a
-  // module." Using type="text/plain" above also stops Babel's automatic
-  // DOM-scanning from double-transforming this same source.
   const _source = document.getElementById('app-source').textContent;
   const _compiled = Babel.transform(_source, {
     presets: [['react', { runtime: 'classic' }]]

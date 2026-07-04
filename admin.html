@@ -216,16 +216,20 @@ function StatCard({ label, value, icon: IconComp }) {
 function ChrgePlusAdmin() {
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState('idle');
+  const [errorDetail, setErrorDetail] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
 
   const load = useCallback(async () => {
     setStatus('loading');
+    setErrorDetail('');
     try {
       const data = await fetchWaitlist();
       setEntries(data);
       setStatus('success');
     } catch (e) {
+      console.error('fetchWaitlist failed:', e);
+      setErrorDetail((e && (e.code || e.message)) ? `${e.code || ''} ${e.message || ''}`.trim() : String(e));
       setStatus('error');
     }
   }, []);
@@ -300,6 +304,11 @@ function ChrgePlusAdmin() {
             <Icon.AlertCircle size={19} color="#ff8a8a" style={{ flexShrink: 0, marginTop: '2px' }} />
             <div>
               <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.3rem' }}>Couldn't load the waitlist</div>
+              {errorDetail && (
+                <div style={{ fontFamily: 'monospace', fontSize: '0.78rem', color: '#ff8a8a', background: 'rgba(0,0,0,0.25)', padding: '0.5rem 0.7rem', borderRadius: '6px', marginBottom: '0.6rem', wordBreak: 'break-word' }}>
+                  {errorDetail}
+                </div>
+              )}
               <div style={{ color: '#c9c9c5', fontSize: '0.83rem', lineHeight: 1.5 }}>
                 Either the Firebase config near the top of this file is still set to placeholder values, or your Firestore rules don't allow reads yet. See the setup notes in the HTML comments — you'll likely need to temporarily allow reads on the <code>waitlist</code> collection, or view signups directly in the Firebase Console instead.
               </div>

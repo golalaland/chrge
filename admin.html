@@ -121,14 +121,41 @@ const Icon = {
   AlertCircle: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
 };
 
+// ============================================================
+// WAIT FOR FIREBASE — polling, not a one-time promise check
+// ------------------------------------------------------------
+// The previous fix checked "does window.__chrgeFirebaseReadyPromise
+// exist" before awaiting it — but if the deferred <script type=
+// "module"> hasn't even STARTED executing yet (not just "still
+// running"), that variable doesn't exist at all, so the check
+// silently skipped waiting. Polling sidesteps this entirely: it
+// doesn't matter when the module script starts or finishes, this
+// just keeps checking every 50ms until the flag flips one way or
+// the other, or a generous timeout elapses.
+// ============================================================
+function waitForFirebase(timeoutMs = 8000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    (function check() {
+      if (window.__chrgeFirebaseReady && window.__chrgeFirestore) {
+        resolve(true);
+        return;
+      }
+      if (window.__chrgeFirebaseReady === false) {
+        reject(window.__chrgeFirebaseInitError || new Error('firebase-init-failed'));
+        return;
+      }
+      if (Date.now() - start > timeoutMs) {
+        reject(new Error('firebase-init-timeout: Firebase never signaled ready or failed within 8s'));
+        return;
+      }
+      setTimeout(check, 50);
+    })();
+  });
+}
+
 async function fetchWaitlist() {
-  if (window.__chrgeFirebaseReadyPromise) {
-    await window.__chrgeFirebaseReadyPromise;
-  }
-  if (!window.__chrgeFirebaseReady || !window.__chrgeFirestore) {
-    const initErr = window.__chrgeFirebaseInitError;
-    throw new Error(initErr ? `firebase-init-failed: ${initErr.message || initErr}` : 'firebase-unavailable');
-  }
+  await waitForFirebase();
   const { db, collection, getDocs, query, orderBy } = window.__chrgeFirestore;
   const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);

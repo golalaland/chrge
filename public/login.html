@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign In — CHRGE Verify</title>
+<link rel="stylesheet" href="css/admin.css">
+<style>
+  body {
+    display: flex; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 1.5rem;
+    background:
+      radial-gradient(ellipse 700px 500px at 20% -10%, rgba(195,246,12,0.08), transparent 60%),
+      radial-gradient(ellipse 600px 400px at 100% 100%, rgba(195,246,12,0.05), transparent 60%),
+      var(--void);
+  }
+  .login-card {
+    width: 100%; max-width: 400px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2.5rem;
+  }
+  .login-logo { width: 130px; margin-bottom: 2rem; }
+  .login-title { font-family: var(--font-display); font-weight: 700; font-size: 1.4rem; margin-bottom: 0.3rem; }
+  .login-sub { color: var(--paper-dim); font-size: 0.88rem; margin-bottom: 2rem; }
+  .error-banner {
+    background: var(--danger-dim); border: 1px solid rgba(255,92,92,0.3);
+    border-radius: var(--radius-sm); padding: 0.8rem 1rem;
+    font-size: 0.83rem; color: #ffb3b3; margin-bottom: 1.4rem;
+    display: none;
+  }
+  .error-banner.show { display: block; }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <svg class="login-logo" viewBox="0 0 1942 809" fill="none">
+    <g transform="translate(0,809) scale(0.1,-0.1)" fill="#F4F4F2" stroke="none">
+      <path d="M2282 5120 c-97 -26 -162 -62 -221 -125 -60 -64 -94 -128 -115 -222
+      -14 -62 -16 -157 -16 -712 0 -692 3 -735 54 -843 53 -111 144 -188 270 -227
+      67 -21 83 -21 861 -21 448 0 814 4 841 9 265 51 419 272 394 571 l-5 65 -234
+      3 c-151 1 -238 -1 -246 -8 -7 -6 -15 -35 -17 -66 -5 -58 -24 -93 -72 -128 -27
+      -21 -40 -21 -609 -24 -320 -2 -596 0 -614 3 -39 7 -87 46 -111 89 -15 28 -17
+      79 -19 521 -1 270 2 519 7 554 10 76 31 108 90 139 l44 22 576 0 576 0 44 -22
+      c57 -30 80 -63 88 -129 l7 -54 250 0 250 0 -3 100 c-3 133 -17 196 -59 278
+      -58 110 -153 182 -298 224 -54 16 -133 18 -850 20 -754 2 -793 1 -863 -17z
+      M4758 5129 c-17 -9 -18 -71 -18 -1072 0 -814 3 -1066 12 -1075 9 -9 76 -12
+      240 -12 214 0 228 1 238 19 6 13 10 174 10 454 0 387 2 436 16 441 9 3 298 6
+      643 6 474 0 630 -3 639 -12 9 -9 12 -122 12 -448 0 -326 3 -439 12 -448 17
+      -17 459 -17 476 0 9 9 12 261 12 1075 0 1040 0 1063 -19 1073 -12 6 -106 10
+      -235 10 -182 0 -217 -2 -230 -16 -14 -13 -16 -65 -16 -418 0 -299 -3 -405 -12
+      -414 -9 -9 -165 -12 -639 -12 -345 0 -634 3 -643 6 -14 5 -16 51 -16 414 0
+      381 -1 408 -18 423 -16 15 -47 17 -233 17 -127 0 -221 -5 -231 -11z M7498
+      5129 c-17 -9 -18 -71 -18 -1072 0 -814 3 -1066 12 -1075 18 -18 461 -17 477 1
+      7 10 12 131 13 383 l3 369 357 3 357 2 24 -22 c22 -20 209 -311 405 -628 36
+      -58 70 -108 76 -112 6 -4 129 -8 272 -8 200 0 264 3 272 13 11 13 9 17 -300
+      498 -86 135 -160 253 -163 261 -5 12 4 17 37 22 131 21 295 149 356 276 53
+      112 65 201 60 448 -4 204 -6 222 -31 291 -73 207 -221 312 -492 351 -96 13
+      -1694 13 -1717 -1z m1601 -419 c58 -16 100 -52 127 -107 25 -49 26 -60 23
+      -175 -4 -112 -6 -127 -31 -169 -19 -31 -42 -54 -80 -75 l-53 -29 -538 -3
+      c-399 -2 -543 0 -553 9 -11 9 -14 62 -14 279 0 146 3 270 7 273 10 11 1074 8
+      1112 -3z M10434 5125 c-181 -39 -301 -154 -352 -338 -15 -56 -17 -128 -17
+      -732 0 -606 2 -676 17 -733 50 -181 159 -294 323 -337 87 -22 1617 -22 1713 0
+      184 43 312 176 357 368 13 55 15 138 13 494 l-3 428 -645 0 -644 0 -58 -175
+      c-32 -96 -58 -183 -58 -192 0 -17 30 -18 453 -20 l452 -3 0 -197 c0 -224 -3
+      -233 -85 -275 l-44 -23 -582 0 -581 0 -44 23 c-31 16 -51 36 -66 67 -23 44
+      -23 44 -23 575 0 531 0 531 23 575 15 31 35 51 66 67 l44 23 887 0 c676 0 889
+      3 898 12 8 8 12 67 12 198 0 131 -4 190 -12 198 -18 18 -1959 16 -2044 -3z
+      M12966 5124 c-13 -13 -16 -45 -16 -190 0 -102 4 -183 10 -195 10 -19 33 -19
+      1048 -19 794 0 1041 3 1050 12 17 17 17 379 0 396 -9 9 -255 12 -1044 12 -925
+      0 -1034 -2 -1048 -16z M16397 4922 c-15 -16 -17 -52 -17 -296 0 -172 -4 -285
+      -10 -297 -10 -18 -24 -19 -298 -19 -244 0 -291 -2 -310 -16 -22 -15 -22 -19
+      -22 -228 0 -194 2 -214 18 -229 16 -15 52 -17 304 -17 263 0 286 -1 301 -18
+      15 -16 17 -52 17 -299 0 -258 1 -281 18 -296 16 -15 47 -17 230 -17 199 0 213
+      1 232 20 19 19 20 33 20 303 0 207 3 286 12 295 9 9 89 12 300 12 275 0 289 1
+      308 20 19 19 20 33 20 225 0 192 -1 206 -20 225 -19 19 -33 20 -308 20 -211 0
+      -291 3 -300 12 -9 9 -12 88 -12 295 0 270 -1 284 -20 303 -19 19 -33 20 -233
+      20 -195 0 -215 -2 -230 -18z M12962 4268 c-18 -18 -17 -1257 1 -1281 11 -16
+      83 -17 1057 -15 l1045 3 3 194 c2 134 -1 198 -9 207 -10 12 -143 14 -803 14
+      -603 0 -795 3 -804 12 -9 9 -12 75 -12 233 0 202 2 223 18 238 17 15 91 17
+      813 19 l794 3 0 190 0 190 -1045 3 c-805 2 -1049 -1 -1058 -10z"/>
+    </g>
+  </svg>
+
+  <div class="login-title">CHRGE Verify</div>
+  <div class="login-sub">Admin access only. Sign in to continue.</div>
+
+  <div id="errorBanner" class="error-banner"></div>
+
+  <form id="loginForm">
+    <div class="form-group">
+      <label class="form-label" for="email">Email</label>
+      <input type="email" id="email" class="form-input" placeholder="you@chrgeplus.com" required autocomplete="email">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="password">Password</label>
+      <input type="password" id="password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+    </div>
+    <button type="submit" id="submitBtn" class="btn btn-primary" style="width:100%; justify-content:center; margin-top:0.6rem;">
+      Sign in
+    </button>
+  </form>
+</div>
+
+<script type="module" src="js/pages/login.js"></script>
+</body>
+</html>

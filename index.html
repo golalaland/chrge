@@ -590,12 +590,18 @@ function PhoneInput({ value, onChange, country, onCountryChange }) {
 }
 
 // ============================================================
-// CONFETTI — tasteful ~1s burst on waitlist success
+// CONFETTI — tasteful ~1s sparkling burst on waitlist success
+// ------------------------------------------------------------
+// Mixes three particle types: small glowing dots (neon glow via
+// box-shadow, reads as "sparkle" rather than flat confetti),
+// tiny 4-point star shapes (clip-path diamond/star), and a few
+// classic confetti rectangles for texture — rather than one
+// uniform shape falling uniformly.
 // ============================================================
 function fireChrgeConfetti(hostEl) {
   if (!hostEl) return;
   const colors = ['#C3F60C', '#e8ff8a', '#F4F4F2'];
-  const count = 22;
+  const count = 26;
   const originX = hostEl.clientWidth / 2;
   const originY = 44;
 
@@ -605,23 +611,42 @@ function fireChrgeConfetti(hostEl) {
     const distance = 55 + Math.random() * 85;
     const cx = Math.cos(angle) * distance;
     const cy = Math.sin(angle) * distance - 15;
-    const size = 4 + Math.random() * 5;
     const color = colors[Math.floor(Math.random() * colors.length)];
     const rotation = Math.round(Math.random() * 360);
+    const particleType = i % 3; // 0 = sparkle dot, 1 = star, 2 = confetti rect
 
     el.style.position = 'absolute';
     el.style.left = originX + 'px';
     el.style.top = originY + 'px';
-    el.style.width = size + 'px';
-    el.style.height = (size * (Math.random() > 0.5 ? 1 : 2.2)) + 'px';
     el.style.background = color;
-    el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
     el.style.setProperty('--cx', cx + 'px');
     el.style.setProperty('--cy', cy + 'px');
     el.style.setProperty('--cr', rotation + 'deg');
     el.style.animation = `chrgeConfettiFall ${0.7 + Math.random() * 0.4}s ease-out forwards`;
     el.style.pointerEvents = 'none';
     el.style.zIndex = '1';
+
+    if (particleType === 0) {
+      // Glowing sparkle dot
+      const size = 3 + Math.random() * 3;
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.borderRadius = '50%';
+      el.style.boxShadow = `0 0 6px 1px ${color}, 0 0 2px ${color}`;
+    } else if (particleType === 1) {
+      // 4-point star/diamond twinkle shape
+      const size = 6 + Math.random() * 4;
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.clipPath = 'polygon(50% 0%, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0% 50%, 39% 39%)';
+      el.style.boxShadow = `0 0 5px ${color}`;
+    } else {
+      // Classic confetti rectangle for texture
+      const size = 4 + Math.random() * 5;
+      el.style.width = size + 'px';
+      el.style.height = (size * (Math.random() > 0.5 ? 1 : 2.2)) + 'px';
+      el.style.borderRadius = Math.random() > 0.5 ? '50%' : '2px';
+    }
 
     hostEl.appendChild(el);
     setTimeout(() => { if (el.parentNode) el.remove(); }, 1300);
@@ -860,12 +885,14 @@ function ProductSlider() {
               border: '1px solid rgba(244,244,242,0.08)',
               borderRadius: '16px',
               aspectRatio: '16 / 9',
+              overflow: 'hidden',
               display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-              gap: '1rem', padding: '2rem'
+              gap: slide.image ? 0 : '1rem',
+              padding: slide.image ? 0 : '2rem'
             }}>
               {slide.image ? (
                 <img src={slide.image} alt={slide.title} loading="lazy" draggable="false"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '16px' }} />
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
               ) : (
                 <>
                   <div style={{

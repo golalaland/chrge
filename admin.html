@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -45,7 +46,9 @@ stranger with the link to see, until Option B is in place.
 ============================================================ -->
 
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <script type="module">
@@ -55,15 +58,13 @@ stranger with the link to see, until Option B is in place.
   // ============================================================
   // PASTE YOUR FIREBASE CONFIG HERE — same as index.html
   // ============================================================
-  /* ── Firebase Configuration ── */
   const firebaseConfig = {
-    apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
-    authDomain: "dettyverse.firebaseapp.com",
-    projectId: "dettyverse",
-    storageBucket: "cubeology",
-    messagingSenderId: "1036459652488",
-    appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
-    measurementId: "G-KPSCEYNZWX"
+    apiKey: "YOUR_API_KEY",
+    authDomain: "chrge-plus.firebaseapp.com",
+    projectId: "chrge-plus",
+    storageBucket: "chrge-plus.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
   };
 
   try {
@@ -95,6 +96,7 @@ stranger with the link to see, until Option B is in place.
   tbody tr:hover { background: rgba(244,244,242,0.02); }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
+
 </head>
 <body>
 
@@ -193,6 +195,14 @@ const fmtDate = (ts) => {
   }
 };
 
+// Same technique used on the landing page's phone input: derive a
+// flag emoji from an ISO 3166-1 alpha-2 code at render time, rather
+// than storing/duplicating flag data here.
+const isoToFlagEmoji = (iso) => {
+  if (!iso || typeof iso !== 'string' || iso.length !== 2) return '';
+  return iso.toUpperCase().replace(/./g, ch => String.fromCodePoint(127397 + ch.charCodeAt(0)));
+};
+
 function StatCard({ label, value, icon: IconComp }) {
   return (
     <div style={{ background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderRadius: '14px', padding: '1.4rem 1.6rem', display: 'flex', alignItems: 'center', gap: '1rem', flex: 1 }}>
@@ -233,6 +243,7 @@ function ChrgePlusAdmin() {
       return (e.name || '').toLowerCase().includes(s) ||
              (e.email || '').toLowerCase().includes(s) ||
              (e.city || '').toLowerCase().includes(s) ||
+             (e.phone || '').toLowerCase().includes(s) ||
              (e.venueName || '').toLowerCase().includes(s);
     }
     return true;
@@ -242,9 +253,9 @@ function ChrgePlusAdmin() {
   const venueCount = entries.filter(e => e.role === 'venue').length;
 
   const exportCsv = () => {
-    const rows = [['Name', 'Email', 'Role', 'City', 'Venue', 'Joined']];
+    const rows = [['Name', 'Email', 'Phone', 'Role', 'City', 'Venue', 'Joined']];
     filtered.forEach(e => {
-      rows.push([e.name || '', e.email || '', e.role || '', e.city || '', e.venueName || '', fmtDate(e.createdAt)]);
+      rows.push([e.name || '', e.email || '', e.phone || '', e.role || '', e.city || '', e.venueName || '', fmtDate(e.createdAt)]);
     });
     const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -338,13 +349,21 @@ function ChrgePlusAdmin() {
             <div style={{ overflowX: 'auto' }}>
               <table>
                 <thead>
-                  <tr><th>Name</th><th>Email</th><th>Role</th><th>City</th><th>Venue</th><th>Joined</th></tr>
+                  <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>City</th><th>Venue</th><th>Joined</th></tr>
                 </thead>
                 <tbody>
                   {filtered.map(e => (
                     <tr key={e.id}>
                       <td style={{ fontWeight: 500 }}>{e.name || '—'}</td>
                       <td style={{ color: '#c9c9c5' }}>{e.email}</td>
+                      <td style={{ color: '#9a9a96' }}>
+                        {e.phone ? (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                            {e.phoneCountry && <span>{isoToFlagEmoji(e.phoneCountry)}</span>}
+                            <span>{e.phone}</span>
+                          </span>
+                        ) : '—'}
+                      </td>
                       <td>
                         <span style={{
                           padding: '0.2rem 0.6rem', borderRadius: '999px', fontSize: '0.72rem',

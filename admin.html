@@ -14,6 +14,15 @@
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 
   import {
+    getAuth,
+    setPersistence,
+    browserLocalPersistence,
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut
+  } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-auth.js";
+
+  import {
     initializeFirestore,
     getFirestore,
     persistentLocalCache,
@@ -77,6 +86,15 @@
       }
 
       window.__chrgeFirestore = { db, collection, getDocs, query, orderBy, doc, writeBatch };
+
+      const auth = getAuth(app);
+      try {
+        await setPersistence(auth, browserLocalPersistence);
+      } catch (err) {
+        console.warn("[AUTH] Could not set persistence:", err);
+      }
+      window.__chrgeAuth = { auth, onAuthStateChanged, signInWithEmailAndPassword, signOut };
+
       window.__chrgeFirebaseReady = true;
       console.log("✅ Firebase Admin Dashboard Ready");
       return true;
@@ -265,7 +283,141 @@ function StatCard({ label, value, icon: IconComp }) {
   );
 }
 
-function ChrgePlusAdmin() {
+// ============================================================
+// LOGIN
+// ------------------------------------------------------------
+// There is deliberately no sign-up form here — only accounts you
+// create yourself in Firebase Console → Authentication → Users
+// can sign in. This isn't self-serve, which is exactly the point.
+// ============================================================
+function Login({ onSignedIn }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await waitForFirebase();
+      const { auth, signInWithEmailAndPassword } = window.__chrgeAuth;
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      onSignedIn();
+    } catch (err) {
+      console.error('Sign-in failed:', err);
+      const code = err && err.code ? err.code : '';
+      if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) {
+        setError('Incorrect email or password.');
+      } else if (code.includes('too-many-requests')) {
+        setError('Too many attempts. Wait a moment and try again.');
+      } else {
+        setError('Sign-in failed: ' + (err.message || err));
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      background: '#0A0A0A', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: "'Inter', sans-serif", padding: '1.5rem'
+    }}>
+      <div style={{ width: '100%', maxWidth: '380px', background: '#131311', border: '1px solid rgba(244,244,242,0.1)', borderRadius: '16px', padding: '2.2rem' }}>
+        <ChrgeLogo style={{ width: '120px', marginBottom: '1.6rem' }} />
+        <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '1.15rem', color: '#F4F4F2', marginBottom: '0.3rem' }}>
+          Waitlist Admin
+        </div>
+        <div style={{ color: '#9a9a96', fontSize: '0.85rem', marginBottom: '1.6rem' }}>
+          Sign in to view signups.
+        </div>
+
+        {error && (
+          <div style={{ background: 'rgba(255,138,138,0.08)', border: '1px solid rgba(255,138,138,0.3)', borderRadius: '9px', padding: '0.7rem 0.9rem', fontSize: '0.82rem', color: '#ff8a8a', marginBottom: '1rem' }}>
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ marginBottom: '0.8rem' }}>
+            <input
+              type="email" placeholder="Email" required value={email}
+              onChange={e => setEmail(e.target.value)} autoComplete="email"
+              style={{ width: '100%', padding: '0.75rem 0.9rem', borderRadius: '9px', border: '1px solid rgba(244,244,242,0.14)', background: 'rgba(244,244,242,0.03)', color: '#F4F4F2', fontSize: '0.9rem', outline: 'none' }}
+            />
+          </div>
+          <div style={{ marginBottom: '1.2rem' }}>
+            <input
+              type="password" placeholder="Password" required value={password}
+              onChange={e => setPassword(e.target.value)} autoComplete="current-password"
+              style={{ width: '100%', padding: '0.75rem 0.9rem', borderRadius: '9px', border: '1px solid rgba(244,244,242,0.14)', background: 'rgba(244,244,242,0.03)', color: '#F4F4F2', fontSize: '0.9rem', outline: 'none' }}
+            />
+          </div>
+          <button type="submit" disabled={loading} style={{
+            width: '100%', padding: '0.85rem', borderRadius: '9px', border: 'none',
+            background: '#C3F60C', color: '#0A0A0A',
+            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.9rem',
+            cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.7 : 1
+          }}>
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// AUTH GATE
+// ------------------------------------------------------------
+// Shows a loading state while Firebase resolves whether anyone
+// is already signed in (e.g. returning from a previous session),
+// then either the Login screen or the real dashboard.
+// ============================================================
+function AuthGate() {
+  const [authState, setAuthState] = useState('checking'); // checking | signedOut | signedIn
+  const [userEmail, setUserEmail] = useState('');
+
+  useEffect(() => {
+    let unsubscribe = () => {};
+    (async () => {
+      try {
+        await waitForFirebase();
+        const { auth, onAuthStateChanged } = window.__chrgeAuth;
+        unsubscribe = onAuthStateChanged(auth, (user) => {
+          if (user) {
+            setUserEmail(user.email || '');
+            setAuthState('signedIn');
+          } else {
+            setAuthState('signedOut');
+          }
+        });
+      } catch (e) {
+        console.error('Auth check failed:', e);
+        setAuthState('signedOut');
+      }
+    })();
+    return () => unsubscribe();
+  }, []);
+
+  if (authState === 'checking') {
+    return (
+      <div style={{ background: '#0A0A0A', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Icon.RefreshCw size={22} color="#6b6b68" style={{ animation: 'spin 1s linear infinite' }} />
+      </div>
+    );
+  }
+
+  if (authState === 'signedOut') {
+    return <Login onSignedIn={() => {}} />;
+  }
+
+  return <ChrgePlusAdmin userEmail={userEmail} />;
+}
+
+function ChrgePlusAdmin({ userEmail }) {
   const [entries, setEntries] = useState([]);
   const [status, setStatus] = useState('idle');
   const [errorDetail, setErrorDetail] = useState('');
@@ -352,7 +504,7 @@ function ChrgePlusAdmin() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <ChrgeLogo style={{ width: '110px', marginBottom: '0.6rem' }} />
-            <div style={{ color: '#9a9a96', fontSize: '0.85rem' }}>Waitlist dashboard</div>
+            <div style={{ color: '#9a9a96', fontSize: '0.85rem' }}>Waitlist dashboard{userEmail ? ` · ${userEmail}` : ''}</div>
           </div>
           <div style={{ display: 'flex', gap: '0.6rem' }}>
             <button onClick={load} disabled={status === 'loading'} style={{
@@ -373,6 +525,19 @@ function ChrgePlusAdmin() {
             }}>
               <Icon.Download size={15} />
               Export CSV
+            </button>
+            <button onClick={async () => {
+              try {
+                await waitForFirebase();
+                const { auth, signOut } = window.__chrgeAuth;
+                await signOut(auth);
+              } catch (e) { console.error('Sign out failed:', e); }
+            }} style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.1rem', borderRadius: '9px',
+              border: '1px solid rgba(255,138,138,0.25)', background: 'transparent', color: '#ff8a8a',
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer'
+            }}>
+              Sign out
             </button>
           </div>
         </div>
@@ -525,7 +690,7 @@ function ChrgePlusAdmin() {
 }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<ChrgePlusAdmin />);
+root.render(<AuthGate />);
 </script>
 
 <script>

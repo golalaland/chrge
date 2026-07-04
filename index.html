@@ -1,5 +1,3 @@
-
-
 <!DOCTYPE html>
 
 <html lang="en">
@@ -480,19 +478,23 @@ function PhoneInput({ value, onChange, country, onCountryChange }) {
   });
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', display: 'flex', gap: '0.5rem' }}>
+    <div ref={wrapRef} style={{ position: 'relative', display: 'flex', flexWrap: 'nowrap', gap: '0.4rem' }}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
         style={{
-          ...inputStyle,
-          display: 'flex', alignItems: 'center', gap: '0.4rem',
-          width: 'auto', flexShrink: 0, cursor: 'pointer', whiteSpace: 'nowrap'
+          display: 'flex', alignItems: 'center', gap: '0.25rem',
+          padding: '0.55rem 0.5rem',
+          borderRadius: '10px',
+          border: '1.5px solid rgba(244,244,242,0.12)',
+          background: 'rgba(244,244,242,0.03)',
+          flexShrink: 0, flexGrow: 0,
+          cursor: 'pointer', whiteSpace: 'nowrap'
         }}
       >
-        <span style={{ fontSize: '1.05rem', lineHeight: 1 }}>{isoToFlagEmoji(country.iso)}</span>
-        <span style={{ fontSize: '0.85rem', color: '#F4F4F2' }}>+{country.dial}</span>
-        <span style={{ fontSize: '0.65rem', color: '#6b6b68' }}>▾</span>
+        <span style={{ fontSize: '0.95rem', lineHeight: 1 }}>{isoToFlagEmoji(country.iso)}</span>
+        <span style={{ fontSize: '0.78rem', color: '#F4F4F2', fontWeight: 500 }}>+{country.dial}</span>
+        <span style={{ fontSize: '0.55rem', color: '#6b6b68' }}>▾</span>
       </button>
 
       <input

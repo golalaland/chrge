@@ -11,24 +11,68 @@
  * ------------------------------------------------------------
  */
 
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-import { getFunctions } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 
-// ============================================================
-// PASTE YOUR FIREBASE CONFIG HERE
-// ============================================================
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+import {
+  getAuth
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+import {
+  getFunctions
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+
+/* ── Firebase Configuration ── */
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "chrge-verify.firebaseapp.com",
-  projectId: "chrge-verify",
-  storageBucket: "chrge-verify.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
+  authDomain: "dettyverse.firebaseapp.com",
+  projectId: "dettyverse",
+  storageBucket: "cubeology",
+  messagingSenderId: "1036459652488",
+  appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
+  measurementId: "G-KPSCEYNZWX"
 };
 
+/* ── Initialize App ── */
 export const app = initializeApp(firebaseConfig);
+
+/* ── Firestore (CHRGE database) ── */
+let db;
+
+try {
+  db = initializeFirestore(
+    app,
+    {
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    },
+    "chrge"           // ← your NEW Firestore database
+  );
+
+  console.log("✅ Connected to Firestore database: chrge");
+
+} catch (err) {
+
+  console.warn("Persistent cache unavailable:", err);
+
+  db = getFirestore(app, "chrge");   // fallback still uses chrge
+}
+
+/* ── Other Services ── */
+
 export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const functions = getFunctions(app, 'us-central1');
+
+/*
+   Use the region where you'll deploy the CHRGE functions.
+   Replace if different.
+*/
+export const functions = getFunctions(app, "europe-west1");
+
+export { db };

@@ -6,75 +6,86 @@
 <title>CHRGE+ | Waitlist Admin</title>
 <meta name="robots" content="noindex, nofollow">
 
-<!-- ============================================================
-FIREBASE SETUP
-------------------------------------------------------------
-Use the EXACT SAME config you pasted into index.html (the
-landing page) — this dashboard reads from the same `waitlist`
-collection that page writes to. Paste it below where you see
-"YOUR_API_KEY".
-
-NOTE ON SECURITY: the Firestore rules suggested for the landing
-page (allow create, deny read) will make this dashboard unable
-to read data from the browser. You have two options:
-
-  OPTION A (quick — only use while it's just you testing):
-    Temporarily allow reads too:
-      match /waitlist/{doc} {
-        allow create: if true;
-        allow read: if true;
-        allow update, delete: if false;
-      }
-    Anyone who finds this page's URL and has network access
-    could then read the waitlist collection — fine for a
-    private pilot, not once this is public-facing.
-
-  OPTION B (correct long-term):
-    Keep reads locked down, and instead view signups via the
-    Firebase Console (console.firebase.google.com → your
-    project → Firestore Database → waitlist), or put this
-    admin page behind Firebase Auth so only you can log in
-    and read. Ask for the Auth-gated version when you're
-    ready — it's a straightforward addition.
-
-ALSO: this file has "noindex, nofollow" in its meta tags and
-is not linked from the public landing page, so search engines
-won't find it — but the URL itself isn't secret if someone
-guesses it. Don't put anything here you wouldn't want a
-stranger with the link to see, until Option B is in place.
-============================================================ -->
-
 <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 
-  // ============================================================
-  // PASTE YOUR FIREBASE CONFIG HERE — same as index.html
-  // ============================================================
+  import {
+    initializeFirestore,
+    getFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager,
+    collection,
+    getDocs,
+    query,
+    orderBy
+  } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
   const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "chrge-plus.firebaseapp.com",
-    projectId: "chrge-plus",
-    storageBucket: "chrge-plus.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
+    authDomain: "dettyverse.firebaseapp.com",
+    projectId: "dettyverse",
+    storageBucket: "cubeology",
+    messagingSenderId: "1036459652488",
+    appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
+    measurementId: "G-KPSCEYNZWX"
   };
 
-  try {
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    window.__chrgeFirestore = { db, collection, getDocs, query, orderBy };
-    window.__chrgeFirebaseReady = true;
-  } catch (e) {
-    console.error('Firebase init failed', e);
-    window.__chrgeFirebaseReady = false;
-  }
-</script>
+  // ============================================================
+  // READINESS PROMISE
+  // ------------------------------------------------------------
+  // <script type="module"> is always deferred by the browser — it
+  // only runs after the ENTIRE document has finished parsing. The
+  // classic <script> further down (which compiles and mounts the
+  // React app) runs immediately as the parser reaches it, which is
+  // BEFORE this module script gets a turn. That means the app can
+  // mount and call fetchWaitlist() before Firebase has actually
+  // finished initializing, seeing __chrgeFirebaseReady as not-yet-
+  // true and failing with a "firebase-unavailable" error even
+  // though nothing is actually wrong with the config or rules.
+  //
+  // Fixing this properly means the app code should never just
+  // check a boolean once — it should await a promise that resolves
+  // whenever init actually finishes, however long that takes.
+  // ============================================================
+  window.__chrgeFirebaseReadyPromise = (async () => {
+    try {
+      const app = initializeApp(firebaseConfig);
+      console.log("🔥 Firebase Project:", firebaseConfig.projectId);
 
+      let db;
+      try {
+        db = initializeFirestore(
+          app,
+          {
+            localCache: persistentLocalCache({
+              tabManager: persistentMultipleTabManager()
+            })
+          },
+          "chrge"
+        );
+        console.log("📦 Firestore Database: chrge");
+        console.log("✅ Persistent cache enabled");
+      } catch (err) {
+        console.warn("[FIRESTORE] Persistent cache unavailable. Falling back.", err);
+        db = getFirestore(app, "chrge");
+      }
+
+      window.__chrgeFirestore = { db, collection, getDocs, query, orderBy };
+      window.__chrgeFirebaseReady = true;
+      console.log("✅ Firebase Admin Dashboard Ready");
+      return true;
+    } catch (e) {
+      console.error("❌ Firebase initialization failed:", e);
+      window.__chrgeFirebaseReady = false;
+      window.__chrgeFirebaseInitError = e;
+      return false;
+    }
+  })();
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
   * { box-sizing: border-box; }
@@ -101,9 +112,6 @@ stranger with the link to see, until Option B is in place.
 <script type="text/plain" id="app-source">
 const { useState, useEffect, useCallback } = React;
 
-// ============================================================
-// INLINE ICONS
-// ============================================================
 const Icon = {
   Users: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   Store: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-6h16l1 6"/><path d="M3 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/></svg>,
@@ -113,12 +121,13 @@ const Icon = {
   AlertCircle: (p) => <svg viewBox="0 0 24 24" width={p.size||16} height={p.size||16} fill="none" stroke={p.color||"currentColor"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
 };
 
-// ============================================================
-// FIRESTORE FETCH
-// ============================================================
 async function fetchWaitlist() {
+  if (window.__chrgeFirebaseReadyPromise) {
+    await window.__chrgeFirebaseReadyPromise;
+  }
   if (!window.__chrgeFirebaseReady || !window.__chrgeFirestore) {
-    throw new Error('firebase-unavailable');
+    const initErr = window.__chrgeFirebaseInitError;
+    throw new Error(initErr ? `firebase-init-failed: ${initErr.message || initErr}` : 'firebase-unavailable');
   }
   const { db, collection, getDocs, query, orderBy } = window.__chrgeFirestore;
   const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'desc'));
@@ -126,9 +135,6 @@ async function fetchWaitlist() {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
-// ============================================================
-// LOGO
-// ============================================================
 function ChrgeLogo({ style = {}, fill = '#F4F4F2' }) {
   return (
     <svg viewBox="0 0 1942 809" style={style} fill="none">
@@ -191,9 +197,6 @@ const fmtDate = (ts) => {
   }
 };
 
-// Same technique used on the landing page's phone input: derive a
-// flag emoji from an ISO 3166-1 alpha-2 code at render time, rather
-// than storing/duplicating flag data here.
 const isoToFlagEmoji = (iso) => {
   if (!iso || typeof iso !== 'string' || iso.length !== 2) return '';
   return iso.toUpperCase().replace(/./g, ch => String.fromCodePoint(127397 + ch.charCodeAt(0)));
@@ -397,8 +400,6 @@ root.render(<ChrgePlusAdmin />);
 </script>
 
 <script>
-  // Manually transform the JSX source above using the CLASSIC runtime —
-  // see the matching comment in index.html for why this is necessary.
   const _source = document.getElementById('app-source').textContent;
   const _compiled = Babel.transform(_source, {
     presets: [['react', { runtime: 'classic' }]]

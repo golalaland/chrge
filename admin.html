@@ -52,63 +52,85 @@ stranger with the link to see, until Option B is in place.
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
 <script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, collection, getDocs, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-app.js";
 
-  // ============================================================
-  // PASTE YOUR FIREBASE CONFIG HERE — same as index.html
-  // ============================================================
-const firebaseConfig = {
-  apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
-  authDomain: "dettyverse.firebaseapp.com",
-  projectId: "dettyverse",
-  storageBucket: "cubeology",
-  messagingSenderId: "1036459652488",
-  appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
-  measurementId: "G-KPSCEYNZWX"
-};
-
-try {
-  const app = initializeApp(firebaseConfig);
-
-  let db;
-
-  try {
-    db = initializeFirestore(
-      app,
-      {
-        localCache: persistentLocalCache({
-          tabManager: persistentMultipleTabManager()
-        })
-      },
-      "cubeology" // Firestore database ID
-    );
-
-    console.log("📦 Firestore Database: cubeology (persistent cache)");
-  } catch (err) {
-    console.warn(
-      "[FIRESTORE] Persistent cache init failed, falling back:",
-      err
-    );
-
-    db = getFirestore(app, "cubeology");
-  }
-
-  window.__chrgeFirestore = {
-    db,
+  import {
+    initializeFirestore,
+    getFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager,
     collection,
     getDocs,
     query,
     orderBy
+  } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
+
+  // ============================================================
+  // FIREBASE CONFIG
+  // ============================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
+    authDomain: "dettyverse.firebaseapp.com",
+    projectId: "dettyverse",
+    storageBucket: "cubeology",
+    messagingSenderId: "1036459652488",
+    appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
+    measurementId: "G-KPSCEYNZWX"
   };
 
-  window.__chrgeFirebaseReady = true;
-} catch (e) {
-  console.error("Firebase init failed", e);
-  window.__chrgeFirebaseReady = false;
-}
-</script>
+  try {
+    const app = initializeApp(firebaseConfig);
 
+    console.log("🔥 Firebase Project:", firebaseConfig.projectId);
+
+    let db;
+
+    try {
+
+      db = initializeFirestore(
+        app,
+        {
+          localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager()
+          })
+        },
+        "cubeology"
+      );
+
+      console.log("📦 Firestore Database: cubeology");
+      console.log("✅ Persistent cache enabled");
+
+    } catch (err) {
+
+      console.warn(
+        "[FIRESTORE] Persistent cache unavailable. Falling back.",
+        err
+      );
+
+      db = getFirestore(app, "cubeology");
+
+    }
+
+    window.__chrgeFirestore = {
+      db,
+      collection,
+      getDocs,
+      query,
+      orderBy
+    };
+
+    window.__chrgeFirebaseReady = true;
+
+    console.log("✅ Firebase Admin Dashboard Ready");
+
+  } catch (e) {
+
+    console.error("❌ Firebase initialization failed:", e);
+
+    window.__chrgeFirebaseReady = false;
+
+  }
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
   * { box-sizing: border-box; }

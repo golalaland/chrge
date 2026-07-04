@@ -21,7 +21,9 @@
     collection,
     getDocs,
     query,
-    orderBy
+    orderBy,
+    doc,
+    writeBatch
   } from "https://www.gstatic.com/firebasejs/12.0.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -74,7 +76,7 @@
         db = getFirestore(app, "chrge");
       }
 
-      window.__chrgeFirestore = { db, collection, getDocs, query, orderBy };
+      window.__chrgeFirestore = { db, collection, getDocs, query, orderBy, doc, writeBatch };
       window.__chrgeFirebaseReady = true;
       console.log("✅ Firebase Admin Dashboard Ready");
       return true;
@@ -160,6 +162,26 @@ async function fetchWaitlist() {
   const q = query(collection(db, 'waitlist'), orderBy('createdAt', 'desc'));
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+}
+
+// ============================================================
+// MARK AS RSVP'D
+// ------------------------------------------------------------
+// Sets rsvped:true on each given doc ID via a single batched
+// write (not one write per doc — cheaper and atomic). This does
+// NOT delete anything; it just flips a flag the dashboard uses
+// to hide entries from the default view, so a growing waitlist
+// doesn't stay cluttered with people already followed up with.
+// ============================================================
+async function markAsRsvped(ids) {
+  await waitForFirebase();
+  if (!ids || ids.length === 0) return;
+  const { db, doc, writeBatch } = window.__chrgeFirestore;
+  const batch = writeBatch(db);
+  ids.forEach(id => {
+    batch.update(doc(db, 'waitlist', id), { rsvped: true, rsvpedAt: new Date() });
+  });
+  await batch.commit();
 }
 
 function ChrgeLogo({ style = {}, fill = '#F4F4F2' }) {
@@ -249,6 +271,9 @@ function ChrgePlusAdmin() {
   const [errorDetail, setErrorDetail] = useState('');
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [showRsvped, setShowRsvped] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [marking, setMarking] = useState(false);
 
   const load = useCallback(async () => {
     setStatus('loading');
@@ -267,6 +292,7 @@ function ChrgePlusAdmin() {
   useEffect(() => { load(); }, [load]);
 
   const filtered = entries.filter(e => {
+    if (!showRsvped && e.rsvped) return false;
     if (filter !== 'all' && e.role !== filter) return false;
     if (search.trim()) {
       const s = search.toLowerCase();
@@ -281,13 +307,14 @@ function ChrgePlusAdmin() {
 
   const userCount = entries.filter(e => e.role === 'user').length;
   const venueCount = entries.filter(e => e.role === 'venue').length;
+  const rsvpedCount = entries.filter(e => e.rsvped).length;
 
-  const exportCsv = () => {
-    const rows = [['Name', 'Email', 'Phone', 'Role', 'City', 'Venue', 'Joined']];
-    filtered.forEach(e => {
-      rows.push([e.name || '', e.email || '', e.phone || '', e.role || '', e.city || '', e.venueName || '', fmtDate(e.createdAt)]);
+  const buildCsv = (rows) => {
+    const out = [['Name', 'Email', 'Phone', 'Role', 'City', 'Venue', 'RSVP\'d', 'Joined']];
+    rows.forEach(e => {
+      out.push([e.name || '', e.email || '', e.phone || '', e.role || '', e.city || '', e.venueName || '', e.rsvped ? 'Yes' : 'No', fmtDate(e.createdAt)]);
     });
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = out.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -295,6 +322,27 @@ function ChrgePlusAdmin() {
     a.download = 'chrge-plus-waitlist.csv';
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportOnly = () => {
+    buildCsv(filtered);
+    setExportModalOpen(false);
+  };
+
+  const exportAndMark = async () => {
+    setMarking(true);
+    try {
+      const ids = filtered.map(e => e.id);
+      buildCsv(filtered.map(e => ({ ...e, rsvped: true })));
+      await markAsRsvped(ids);
+      setEntries(prev => prev.map(e => ids.includes(e.id) ? { ...e, rsvped: true } : e));
+    } catch (e) {
+      console.error('markAsRsvped failed:', e);
+      alert('Exported the CSV, but marking as RSVP\'d failed: ' + (e.message || e) + '\n\nYour Firestore rules may not allow updates yet.');
+    } finally {
+      setMarking(false);
+      setExportModalOpen(false);
+    }
   };
 
   return (
@@ -316,7 +364,7 @@ function ChrgePlusAdmin() {
               <Icon.RefreshCw size={15} style={{ animation: status === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
               Refresh
             </button>
-            <button onClick={exportCsv} disabled={filtered.length === 0} style={{
+            <button onClick={() => setExportModalOpen(true)} disabled={filtered.length === 0} style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.7rem 1.1rem', borderRadius: '9px', border: 'none',
               background: '#C3F60C', color: '#0A0A0A',
               fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.85rem',
@@ -372,8 +420,62 @@ function ChrgePlusAdmin() {
                 cursor: 'pointer', textTransform: 'capitalize'
               }}>{f}</button>
             ))}
+            <button onClick={() => setShowRsvped(v => !v)} style={{
+              padding: '0.7rem 1.1rem', borderRadius: '9px',
+              border: showRsvped ? '1px solid #C3F60C' : '1px solid rgba(244,244,242,0.12)',
+              background: showRsvped ? 'rgba(195,246,12,0.08)' : 'transparent',
+              color: showRsvped ? '#C3F60C' : '#9a9a96',
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.8rem',
+              cursor: 'pointer', whiteSpace: 'nowrap'
+            }}>
+              {showRsvped ? '✓ ' : ''}Show RSVP'd ({rsvpedCount})
+            </button>
           </div>
         </div>
+
+        {exportModalOpen && (
+          <div
+            onClick={() => !marking && setExportModalOpen(false)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1.5rem' }}
+          >
+            <div onClick={e => e.stopPropagation()} style={{
+              background: '#131311', border: '1px solid rgba(244,244,242,0.12)', borderRadius: '14px',
+              padding: '1.8rem', maxWidth: '420px', width: '100%'
+            }}>
+              <div style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '1.1rem', marginBottom: '0.5rem' }}>
+                Export {filtered.length} signup{filtered.length === 1 ? '' : 's'}
+              </div>
+              <p style={{ color: '#9a9a96', fontSize: '0.85rem', lineHeight: 1.5, marginBottom: '1.4rem' }}>
+                Mark these as RSVP'd too? They'll disappear from this dashboard's default view afterward — the data stays safe in Firestore, and you can bring them back anytime with "Show RSVP'd" above.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <button onClick={exportAndMark} disabled={marking} style={{
+                  padding: '0.85rem', borderRadius: '10px', border: 'none', background: '#C3F60C', color: '#0A0A0A',
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '0.88rem',
+                  cursor: marking ? 'default' : 'pointer', opacity: marking ? 0.7 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem'
+                }}>
+                  {marking ? <Icon.RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : null}
+                  {marking ? 'Marking...' : "Export & Mark as RSVP'd"}
+                </button>
+                <button onClick={exportOnly} disabled={marking} style={{
+                  padding: '0.85rem', borderRadius: '10px', border: '1px solid rgba(244,244,242,0.14)', background: 'transparent', color: '#F4F4F2',
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.88rem',
+                  cursor: marking ? 'default' : 'pointer'
+                }}>
+                  Export only, don't mark
+                </button>
+                <button onClick={() => setExportModalOpen(false)} disabled={marking} style={{
+                  padding: '0.7rem', borderRadius: '10px', border: 'none', background: 'transparent', color: '#6b6b68',
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 600, fontSize: '0.82rem',
+                  cursor: marking ? 'default' : 'pointer'
+                }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={{ background: '#131311', border: '1px solid rgba(244,244,242,0.08)', borderRadius: '14px', overflow: 'hidden' }}>
           {status === 'loading' && entries.length === 0 ? (

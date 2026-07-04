@@ -19,14 +19,16 @@ import { getFunctions } from 'https://www.gstatic.com/firebasejs/10.12.0/firebas
 // ============================================================
 // PASTE YOUR FIREBASE CONFIG HERE
 // ============================================================
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "chrge-verify.firebaseapp.com",
-  projectId: "chrge-verify",
-  storageBucket: "chrge-verify.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+ /* ── Firebase Configuration ── */
+  const firebaseConfig = {
+    apiKey: "AIzaSyD_GjkTox5tum9o4AupO0LeWzjTocJg8RI",
+    authDomain: "dettyverse.firebaseapp.com",
+    projectId: "dettyverse",
+    storageBucket: "cubeology",
+    messagingSenderId: "1036459652488",
+    appId: "1:1036459652488:web:f4284cbc49c8074bc9b63d",
+    measurementId: "G-KPSCEYNZWX"
+  };
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

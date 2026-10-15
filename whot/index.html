@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0a0b" />
+  <title>Naija Whot Online</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            obsidian: '#0a0a0b',
+            charcoal: '#141416',
+            felt: '#0f2e1a',
+            amber: '#f59e0b',
+            gold: '#eab308',
+            glow: '#fbbf24'
+          },
+          fontFamily: {
+            display: ['Segoe UI', 'system-ui', 'sans-serif'],
+            mono: ['ui-monospace', 'SFMono-Regular', 'monospace']
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'float': 'float 3s ease-in-out infinite',
+            'deal': 'dealIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+            'flip': 'cardFlip 0.5s ease',
+            'shake': 'shake 0.4s ease'
+          },
+          keyframes: {
+            float: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(-6px)' }
+            },
+            dealIn: {
+              '0%': { opacity: 0, transform: 'translateY(40px) scale(0.8)' },
+              '100%': { opacity: 1, transform: 'translateY(0) scale(1)' }
+            },
+            cardFlip: {
+              '0%': { transform: 'rotateY(0deg)' },
+              '100%': { transform: 'rotateY(180deg)' }
+            },
+            shake: {
+              '0%, 100%': { transform: 'translateX(0)' },
+              '25%': { transform: 'translateX(-4px)' },
+              '75%': { transform: 'translateX(4px)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="/css/style.css" />
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body class="bg-obsidian text-white font-display antialiased overflow-hidden select-none">
+  <!-- Background ambient -->
+  <div class="fixed inset-0 pointer-events-none">
+    <div class="absolute inset-0 bg-gradient-to-b from-obsidian via-charcoal to-felt opacity-90"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] rounded-full bg-felt/40 blur-3xl"></div>
+  </div>
+
+  <!-- ========== SCREENS ========== -->
+  <!-- LOGIN / USERNAME -->
+  <div id="screen-login" class="relative z-10 min-h-screen flex flex-col items-center justify-center p-6">
+    <div class="text-center mb-10 animate-float">
+      <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-amber/20 to-gold/10 border border-amber/30 mb-4 shadow-lg shadow-amber/10">
+        <span class="text-4xl">🃏</span>
+      </div>
+      <h1 class="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-amber via-gold to-amber bg-clip-text text-transparent">
+        Naija Whot
+      </h1>
+      <p class="text-white/50 mt-2 text-sm tracking-wide">Real-time • 2-Player • Authentic Rules</p>
+    </div>
+
+    <div class="w-full max-w-sm glass-panel p-6 rounded-2xl space-y-5">
+      <div>
+        <label class="block text-xs uppercase tracking-widest text-white/40 mb-2">Your Username</label>
+        <input id="username-input" type="text" maxlength="20" placeholder="e.g. OgaBoss"
+          class="w-full px-4 py-3.5 rounded-xl bg-white/5 border border-white/10 focus:border-amber/50 focus:ring-1 focus:ring-amber/30 outline-none transition text-white placeholder-white/30 text-lg" />
+      </div>
+      <button id="btn-set-username"
+        class="w-full py-3.5 rounded-xl bg-gradient-to-r from-amber to-gold text-obsidian font-semibold text-lg hover:brightness-110 active:scale-[0.98] transition shadow-lg shadow-amber/20">
+        Enter Lobby
+      </button>
+      <p id="login-error" class="text-red-400 text-sm text-center hidden"></p>
+    </div>
+    <p class="mt-8 text-white/30 text-xs">Online players: <span id="online-count">0</span></p>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="relative z-10 min-h-screen flex flex-col hidden">
+    <header class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">🃏</span>
+        <div>
+          <p class="font-semibold text-amber">Naija Whot</p>
+          <p class="text-xs text-white/40">Playing as <span id="lobby-username" class="text-white/70"></span></p>
+        </div>
+      </div>
+      <div class="text-xs text-white/40">
+        <span id="lobby-online">0</span> online
+      </div>
+    </header>
+
+    <main class="flex-1 flex flex-col items-center justify-center p-6 gap-8">
+      <div class="w-full max-w-md glass-panel rounded-2xl p-6 space-y-4">
+        <h2 class="text-lg font-semibold text-center">Challenge a Player</h2>
+        <div class="flex gap-2">
+          <input id="challenge-input" type="text" maxlength="20" placeholder="Enter username..."
+            class="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-amber/50 outline-none transition placeholder-white/30" />
+          <button id="btn-challenge"
+            class="px-5 py-3 rounded-xl bg-amber text-obsidian font-semibold hover:brightness-110 active:scale-95 transition">
+            Challenge
+          </button>
+        </div>
+        <p id="challenge-status" class="text-sm text-center text-white/50 h-5"></p>
+      </div>
+
+      <div class="w-full max-w-md">
+        <p class="text-xs uppercase tracking-widest text-white/40 mb-3 text-center">Online & Available</p>
+        <div id="online-list" class="flex flex-wrap justify-center gap-2 min-h-[40px]">
+          <span class="text-white/30 text-sm">No other players online</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="relative z-10 min-h-screen flex flex-col hidden">
+    <!-- Top bar -->
+    <header class="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-obsidian/80 backdrop-blur-md">
+      <div class="flex items-center gap-3">
+        <button id="btn-leave" class="text-white/40 hover:text-white/70 text-sm">✕ Leave</button>
+        <div>
+          <p class="text-sm font-medium">vs <span id="opp-name" class="text-amber"></span></p>
+          <p id="opp-status" class="text-xs text-white/40">Connected</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <div id="turn-indicator" class="text-xs font-medium px-3 py-1 rounded-full bg-white/5"></div>
+        <button id="btn-sound" class="text-white/50 hover:text-amber text-lg" title="Toggle sound">🔊</button>
+      </div>
+    </header>
+
+    <!-- Opponent hand (backs) -->
+    <div class="flex-shrink-0 py-3 px-2">
+      <div id="opp-hand" class="flex justify-center gap-[-12px] flex-wrap max-w-full overflow-hidden min-h-[70px]"></div>
+    </div>
+
+    <!-- Table area -->
+    <div class="flex-1 flex flex-col items-center justify-center relative px-4">
+      <!-- Timer bar -->
+      <div id="timer-container" class="absolute top-2 left-1/2 -translate-x-1/2 w-48 h-1.5 bg-white/10 rounded-full overflow-hidden hidden">
+        <div id="timer-bar" class="h-full bg-gradient-to-r from-amber to-gold transition-all duration-100 linear origin-left"></div>
+      </div>
+
+      <div class="flex items-center gap-8 md:gap-14">
+        <!-- Market -->
+        <div class="flex flex-col items-center gap-2">
+          <div id="market-pile" class="card-back w-16 h-24 md:w-20 md:h-28 rounded-lg cursor-pointer hover:scale-105 transition-transform shadow-xl relative"
+            title="Draw from Market">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="text-2xl opacity-60">🃏</span>
+            </div>
+          </div>
+          <span id="market-count" class="text-xs text-white/40">0</span>
+        </div>
+
+        <!-- Table (discard) -->
+        <div class="flex flex-col items-center gap-2">
+          <div id="table-card" class="relative w-20 h-28 md:w-24 md:h-36"></div>
+          <div id="required-shape" class="text-xs text-amber font-medium h-4"></div>
+        </div>
+      </div>
+
+      <!-- Pending penalty banner -->
+      <div id="penalty-banner" class="mt-4 px-4 py-2 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-sm font-medium hidden animate-pulse">
+        Pick <span id="penalty-count">0</span>!
+      </div>
+
+      <!-- System message -->
+      <div id="sys-msg" class="mt-3 text-sm text-white/50 text-center min-h-[20px] transition-opacity"></div>
+    </div>
+
+    <!-- My hand -->
+    <div class="flex-shrink-0 pb-safe">
+      <div class="px-2 pt-2 pb-1 flex justify-center">
+        <div id="my-hand" class="flex justify-center items-end gap-1 md:gap-2 flex-wrap max-w-full min-h-[110px] md:min-h-[130px]"></div>
+      </div>
+      <!-- Action bar -->
+      <div class="flex items-center justify-center gap-3 px-4 py-3 border-t border-white/5 bg-obsidian/90 backdrop-blur">
+        <button id="btn-draw" class="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-sm font-medium transition active:scale-95">
+          Market
+        </button>
+        <div class="flex gap-1.5" id="reaction-tray">
+          <!-- filled by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAYS -->
+  <!-- Challenge popup -->
+  <div id="overlay-challenge" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden">
+    <div class="glass-panel rounded-2xl p-6 max-w-sm w-full mx-4 text-center space-y-4 animate-deal">
+      <p class="text-lg">🃏</p>
+      <p class="text-xl font-semibold"><span id="challenger-name" class="text-amber"></span> is challenging you!</p>
+      <p class="text-white/50 text-sm">A game of Whot awaits...</p>
+      <div class="flex gap-3 pt-2">
+        <button id="btn-decline" class="flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/15 font-medium transition">Decline</button>
+        <button id="btn-accept" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber to-gold text-obsidian font-semibold transition">Accept</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Whot shape picker -->
+  <div id="overlay-whot" class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm hidden">
+    <div class="glass-panel rounded-2xl p-6 max-w-sm w-full mx-4 text-center space-y-5 animate-deal">
+      <p class="text-lg font-semibold text-amber">WHOT! Call a shape</p>
+      <div class="grid grid-cols-5 gap-3" id="shape-picker"></div>
+    </div>
+  </div>
+
+  <!-- Game Over -->
+  <div id="overlay-gameover" class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md hidden">
+    <div class="glass-panel rounded-2xl p-8 max-w-sm w-full mx-4 text-center space-y-5 animate-deal">
+      <p id="go-emoji" class="text-5xl">🏆</p>
+      <h2 id="go-title" class="text-2xl font-bold"></h2>
+      <p id="go-subtitle" class="text-white/50"></p>
+      <div id="go-scores" class="text-sm space-y-1"></div>
+      <div class="flex gap-3 pt-2">
+        <button id="btn-rematch" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber to-gold text-obsidian font-semibold">Rematch</button>
+        <button id="btn-lobby" class="flex-1 py-3 rounded-xl bg-white/10 hover:bg-white/15 font-medium">Lobby</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] px-5 py-2.5 rounded-full bg-white/10 backdrop-blur border border-white/10 text-sm opacity-0 pointer-events-none transition-all duration-300"></div>
+
+  <!-- Reaction floating -->
+  <div id="reaction-float" class="fixed z-[55] pointer-events-none text-4xl opacity-0 transition-all duration-700"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

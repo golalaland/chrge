@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a0a0b">
+<title>Naija Whot — Offline</title>
+<style>
+/* ========== RESET & BASE ========== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --obsidian:#0a0a0b;--charcoal:#141416;--felt:#0f2e1a;
+  --amber:#f59e0b;--gold:#eab308;--glow:#fbbf24;
+  --card-w:68px;--card-h:98px;--radius:10px;
+}
+@media(min-width:768px){:root{--card-w:84px;--card-h:120px}}
+html,body{height:100%;overflow:hidden;font-family:system-ui,-apple-system,sans-serif;background:var(--obsidian);color:#fff;-webkit-tap-highlight-color:transparent;user-select:none}
+body{display:flex;flex-direction:column}
+
+/* ========== SCREENS ========== */
+.screen{display:none;flex:1;flex-direction:column;min-height:0}
+.screen.active{display:flex}
+
+/* ========== LOGIN / MENU ========== */
+#screen-menu{align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse at 50% 30%,rgba(15,46,26,.5) 0%,var(--obsidian) 70%)}
+.logo{text-align:center;margin-bottom:36px}
+.logo-icon{width:72px;height:72px;border-radius:18px;background:linear-gradient(145deg,rgba(245,158,11,.2),rgba(234,179,8,.08));border:1px solid rgba(245,158,11,.3);display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 14px;box-shadow:0 8px 32px rgba(245,158,11,.12)}
+.logo h1{font-size:2.4rem;font-weight:800;background:linear-gradient(90deg,var(--amber),var(--gold),var(--amber));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.02em}
+.logo p{color:rgba(255,255,255,.4);font-size:.85rem;margin-top:6px;letter-spacing:.04em}
+.menu-card{width:100%;max-width:340px;background:rgba(20,20,22,.8);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:28px 24px;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.menu-card h2{font-size:1rem;font-weight:600;text-align:center;margin-bottom:18px;color:rgba(255,255,255,.7)}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:1rem;font-weight:600;cursor:pointer;transition:all .15s;text-align:center}
+.btn-primary{background:linear-gradient(90deg,var(--amber),var(--gold));color:var(--obsidian);box-shadow:0 4px 20px rgba(245,158,11,.25)}
+.btn-primary:active{transform:scale(.97);filter:brightness(1.05)}
+.btn-secondary{background:rgba(255,255,255,.07);color:#fff;border:1px solid rgba(255,255,255,.1);margin-top:10px}
+.btn-secondary:active{background:rgba(255,255,255,.12)}
+.menu-note{text-align:center;font-size:.75rem;color:rgba(255,255,255,.3);margin-top:18px}
+
+/* ========== GAME ========== */
+#screen-game{background:radial-gradient(ellipse at 50% 45%,rgba(15,46,26,.45) 0%,var(--obsidian) 65%)}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);background:rgba(10,10,11,.85);backdrop-filter:blur(12px);flex-shrink:0}
+.topbar-left{display:flex;align-items:center;gap:10px}
+.btn-icon{background:none;border:none;color:rgba(255,255,255,.4);font-size:.9rem;cursor:pointer;padding:4px 8px}
+.btn-icon:active{color:#fff}
+.player-label{font-size:.85rem}
+.player-label span{color:var(--amber);font-weight:600}
+.turn-badge{font-size:.7rem;font-weight:600;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.06)}
+.turn-badge.mine{background:rgba(245,158,11,.2);color:var(--amber)}
+.turn-badge.theirs{color:rgba(255,255,255,.45)}
+
+/* Opponent hand */
+.opp-zone{padding:8px 8px 4px;flex-shrink:0;min-height:calc(var(--card-h)*.55 + 16px)}
+.opp-hand{display:flex;justify-content:center;align-items:flex-start;gap:0;overflow:hidden}
+.card-back{width:calc(var(--card-w)*.72);height:calc(var(--card-h)*.72);border-radius:8px;background:linear-gradient(135deg,#1e3a2f,#0f2e1a 50%,#0a1f12);border:1.5px solid rgba(34,197,94,.22);box-shadow:0 3px 10px rgba(0,0,0,.45);position:relative;margin-left:-18px;flex-shrink:0}
+.card-back:first-child{margin-left:0}
+.card-back::after{content:'W';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:900;color:rgba(245,158,11,.22)}
+
+/* Table */
+.table-zone{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;padding:8px;min-height:0}
+.timer-wrap{position:absolute;top:6px;left:50%;transform:translateX(-50%);width:140px;height:3px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}
+.timer-bar{height:100%;width:100%;background:linear-gradient(90deg,var(--amber),var(--gold));transition:width .1s linear;transform-origin:left}
+.timer-bar.critical{background:linear-gradient(90deg,#ef4444,#f97316)}
+.piles{display:flex;align-items:center;gap:28px}
+.pile{display:flex;flex-direction:column;align-items:center;gap:6px}
+.pile-label{font-size:.65rem;color:rgba(255,255,255,.35);letter-spacing:.04em}
+.market-pile{width:var(--card-w);height:var(--card-h);border-radius:var(--radius);background:linear-gradient(135deg,#1e3a2f,#0f2e1a);border:1.5px solid rgba(34,197,94,.25);box-shadow:0 6px 20px rgba(0,0,0,.5);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1.6rem;position:relative;transition:transform .15s}
+.market-pile:active{transform:scale(.95)}
+.market-count{position:absolute;bottom:-18px;font-size:.7rem;color:rgba(255,255,255,.35)}
+.table-card-slot{width:calc(var(--card-w)*1.12);height:calc(var(--card-h)*1.12)}
+.req-shape{font-size:.75rem;color:var(--amber);font-weight:600;min-height:18px;margin-top:4px}
+.penalty-banner{margin-top:10px;padding:6px 16px;border-radius:999px;background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.35);color:#fca5a5;font-size:.8rem;font-weight:600;display:none}
+.penalty-banner.show{display:block;animation:pulse 1.2s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+.sys-msg{margin-top:8px;font-size:.78rem;color:rgba(255,255,255,.45);text-align:center;min-height:18px;transition:opacity .3s}
+
+/* My hand */
+.my-zone{flex-shrink:0;border-top:1px solid rgba(255,255,255,.05);background:rgba(10,10,11,.7);backdrop-filter:blur(10px)}
+.my-hand{display:flex;justify-content:center;align-items:flex-end;gap:4px;padding:10px 6px 6px;flex-wrap:wrap;min-height:calc(var(--card-h)+16px);max-height:calc(var(--card-h)*1.6);overflow-y:auto}
+.action-bar{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 12px 14px;flex-wrap:wrap}
+.btn-action{padding:10px 18px;border-radius:10px;border:none;font-size:.85rem;font-weight:600;cursor:pointer;background:rgba(255,255,255,.08);color:#fff;transition:all .12s}
+.btn-action:active{transform:scale(.96);background:rgba(255,255,255,.14)}
+.btn-action:disabled{opacity:.35;pointer-events:none}
+.btn-market{background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.25)}
+.reaction-btn{width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.05);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.reaction-btn:active{transform:scale(1.2);background:rgba(245,158,11,.2)}
+
+/* ========== CARDS ========== */
+.card{width:var(--card-w);height:var(--card-h);border-radius:var(--radius);cursor:pointer;transition:transform .18s cubic-bezier(.34,1.56,.64,1),box-shadow .18s;flex-shrink:0;position:relative}
+.card:hover:not(.disabled):not(.nohover){transform:translateY(-10px) scale(1.04);z-index:10}
+.card.selected{transform:translateY(-16px) scale(1.07);box-shadow:0 0 0 2px var(--amber),0 10px 24px rgba(245,158,11,.3);z-index:20}
+.card.disabled{opacity:.42;cursor:not-allowed;filter:grayscale(.25)}
+.card.playable{box-shadow:0 0 0 1.5px rgba(245,158,11,.55)}
+.card-face{width:100%;height:100%;border-radius:var(--radius);background:linear-gradient(145deg,#1a1a1e,#121214);border:1.5px solid rgba(255,255,255,.11);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:5px 3px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 4px 12px rgba(0,0,0,.4);position:relative}
+.card-face::before{content:'';position:absolute;inset:2px;border-radius:calc(var(--radius)-3px);border:1px solid rgba(255,255,255,.035);pointer-events:none}
+.card-num{font-weight:700;font-size:12px;color:var(--glow);line-height:1}
+.card-num.top{align-self:flex-start;padding-left:2px}
+.card-num.bot{align-self:flex-end;padding-right:2px;transform:rotate(180deg)}
+.card-shape{flex:1;display:flex;align-items:center;justify-content:center;width:100%}
+.card-shape svg{width:32px;height:32px}
+@media(min-width:768px){.card-num{font-size:14px}.card-shape svg{width:40px;height:40px}}
+.card-face.whot{background:linear-gradient(145deg,#292524,#1c1917);border-color:rgba(245,158,11,.4)}
+.whot-txt{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--glow);text-transform:uppercase}
+.shape-circle{fill:#ef4444}.shape-triangle{fill:#3b82f6}.shape-cross{fill:#22c55e}.shape-square{fill:#a855f7}.shape-star{fill:#eab308}
+
+/* Deal animation */
+@keyframes dealIn{from{opacity:0;transform:translateY(30px) scale(.85)}to{opacity:1;transform:translateY(0) scale(1)}}
+.my-hand .card{animation:dealIn .3s cubic-bezier(.34,1.56,.64,1) backwards}
+
+/* ========== OVERLAYS ========== */
+.overlay{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);padding:20px}
+.overlay.show{display:flex}
+.modal{background:rgba(20,20,22,.92);border:1px solid rgba(255,255,255,.09);border-radius:20px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.5);animation:dealIn .3s ease}
+.modal h2{font-size:1.35rem;margin-bottom:6px}
+.modal p{color:rgba(255,255,255,.5);font-size:.88rem;margin-bottom:18px}
+.shape-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:16px 0}
+.shape-btn{aspect-ratio:1;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s}
+.shape-btn:active,.shape-btn:hover{background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.45);transform:scale(1.08)}
+.shape-btn svg{width:26px;height:26px}
+.modal-actions{display:flex;gap:10px;margin-top:8px}
+.modal-actions .btn{flex:1;padding:12px}
+.score-line{font-size:.85rem;color:rgba(255,255,255,.55);margin:2px 0}
+.score-line strong{color:var(--amber)}
+
+/* Toast */
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(12px);z-index:60;padding:10px 20px;border-radius:999px;background:rgba(255,255,255,.1);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);font-size:.82rem;opacity:0;pointer-events:none;transition:all .3s;white-space:nowrap}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* Floating reaction */
+#float-react{position:fixed;z-index:55;font-size:2.4rem;pointer-events:none;opacity:0;transition:all .7s ease;left:50%;top:45%}
+</style>
+</head>
+<body>
+
+<!-- ========== MENU ========== -->
+<div id="screen-menu" class="screen active">
+  <div class="logo">
+    <div class="logo-icon">🃏</div>
+    <h1>Naija Whot</h1>
+    <p>OFFLINE · AUTHENTIC RULES</p>
+  </div>
+  <div class="menu-card">
+    <h2>Choose Mode</h2>
+    <button class="btn btn-primary" id="btn-vs-ai">Play vs AI</button>
+    <button class="btn btn-secondary" id="btn-hotseat">Pass & Play (2 Players)</button>
+    <p class="menu-note">No internet needed · Full Nigerian rules</p>
+  </div>
+</div>
+
+<!-- ========== GAME ========== -->
+<div id="screen-game" class="screen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="btn-icon" id="btn-quit">✕ Quit</button>
+      <div class="player-label">vs <span id="opp-label">AI</span></div>
+    </div>
+    <div id="turn-badge" class="turn-badge">Your Turn</div>
+  </div>
+
+  <div class="opp-zone">
+    <div class="opp-hand" id="opp-hand"></div>
+  </div>
+
+  <div class="table-zone">
+    <div class="timer-wrap" id="timer-wrap" style="display:none">
+      <div class="timer-bar" id="timer-bar"></div>
+    </div>
+    <div class="piles">
+      <div class="pile">
+        <div class="market-pile" id="market-pile" title="Draw from Market">🃏</div>
+        <span class="market-count" id="market-count">0</span>
+      </div>
+      <div class="pile">
+        <div class="table-card-slot" id="table-slot"></div>
+        <div class="req-shape" id="req-shape"></div>
+      </div>
+    </div>
+    <div class="penalty-banner" id="penalty-banner">Pick <span id="penalty-num">0</span>!</div>
+    <div class="sys-msg" id="sys-msg"></div>
+  </div>
+
+  <div class="my-zone">
+    <div class="my-hand" id="my-hand"></div>
+    <div class="action-bar">
+      <button class="btn-action btn-market" id="btn-draw">Market</button>
+      <button class="reaction-btn" data-e="😂">😂</button>
+      <button class="reaction-btn" data-e="😲">😲</button>
+      <button class="reaction-btn" data-e="🔥">🔥</button>
+      <button class="reaction-btn" data-e="😭">😭</button>
+      <button class="reaction-btn" data-e="😤">😤</button>
+      <button class="reaction-btn" data-e="🙏">🙏</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== OVERLAYS ========== -->
+<div class="overlay" id="overlay-whot">
+  <div class="modal">
+    <h2 style="color:var(--amber)">WHOT!</h2>
+    <p>Call a shape for the next player</p>
+    <div class="shape-grid" id="shape-grid"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-gameover">
+  <div class="modal">
+    <div id="go-emoji" style="font-size:3rem;margin-bottom:8px">🏆</div>
+    <h2 id="go-title">You Win!</h2>
+    <p id="go-sub"></p>
+    <div id="go-scores"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="btn-again">Play Again</button>
+      <button class="btn btn-secondary" id="btn-menu" style="margin-top:0">Menu</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-pass">
+  <div class="modal">
+    <h2 id="pass-title">Player 2's Turn</h2>
+    <p>Pass the device and tap Continue</p>
+    <button class="btn btn-primary" id="btn-pass-ok">Continue</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<div id="float-react"></div>
+
+<script>
+/* ============================================================
+   NAIJA WHOT — FULLY OFFLINE ENGINE
+   Authentic Nigerian rules · vs AI · Pass & Play
+   ============================================================ */
+(() => {
+'use strict';
+
+// ---------- CONSTANTS ----------
+const SHAPES = ['circle','triangle','cross','square','star'];
+const DEAL = 6;
+const TURN_MS = 25000;
+const SVG = {
+  circle:   '<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="14" class="shape-circle"/></svg>',
+  triangle: '<svg viewBox="0 0 40 40"><polygon points="20,6 34,32 6,32" class="shape-triangle"/></svg>',
+  cross:    '<svg viewBox="0 0 40 40"><path d="M16 6h8v10h10v8H24v10h-8V24H6v-8h10V6z" class="shape-cross"/></svg>',
+  square:   '<svg viewBox="0 0 40 40"><rect x="8" y="8" width="24" height="24" rx="2" class="shape-square"/></svg>',
+  star:     '<svg viewBox="0 0 40 40"><polygon points="20,4 24.5,15 36,15.5 27,23 30,34 20,27.5 10,34 13,23 4,15.5 15.5,15" class="shape-star"/></svg>'
+};
+
+// ---------- STATE ----------
+const S = {
+  mode: null,          // 'ai' | 'hotseat'
+  market: [],
+  table: [],
+  hands: [[], []],     // 0 = human / P1, 1 = AI / P2
+  turn: 0,
+  requiredShape: null,
+  pendingPenalty: 0,
+  penaltyType: null,   // '2' | '5'
+  gameOver: false,
+  winner: null,
+  scores: [0, 0],
+  timer: null,
+  deadline: null,
+  awaitingWhot: false,
+  passPending: false
+};
+
+// ---------- DECK ----------
+function createDeck() {
+  const d = [];
+  ['circle','triangle'].forEach(s => {
+    [1,2,3,4,5,7,8,10,11,12,13,14].forEach(n => d.push({id:`${s}-${n}`,shape:s,number:n}));
+  });
+  ['cross','square'].forEach(s => {
+    [1,2,3,5,7,10,11,13,14].forEach(n => d.push({id:`${s}-${n}`,shape:s,number:n}));
+  });
+  [1,2,3,4,5,7,8].forEach(n => d.push({id:`star-${n}`,shape:'star',number:n}));
+  for (let i=1;i<=5;i++) d.push({id:`whot-${i}`,shape:'whot',number:20});
+  return d;
+}
+function shuffle(a) {
+  const arr = [...a];
+  for (let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]];}
+  return arr;
+}
+
+// ---------- RULES HELPERS ----------
+function isValid(card, top, reqShape, pend, pType) {
+  if (pend > 0) {
+    if (pType==='2' && card.number===2) return true;
+    if (pType==='5' && card.number===5) return true;
+    return false;
+  }
+  if (card.number===20) return true;
+  if (reqShape) return card.shape===reqShape;
+  if (!top) return true;
+  return card.shape===top.shape || card.number===top.number;
+}
+function scoreHand(hand) {
+  let s=0;
+  for (const c of hand) {
+    if (c.number===20) s+=20;
+    else if (c.shape==='star') s+=c.number*2;
+    else s+=c.number;
+  }
+  return s;
+}
+function draw(player, n) {
+  const drawn=[];
+  for (let i=0;i<n;i++) {
+    if (S.market.length===0) {
+      if (S.table.length>1) {
+        const top=S.table.pop();
+        S.market=shuffle(S.table);
+        S.table=[top];
+      } else break;
+    }
+    if (S.market.length) {
+      const c=S.market.pop();
+      S.hands[player].push(c);
+      drawn.push(c);
+    }
+  }
+  return drawn;
+}
+
+// ---------- GAME FLOW ----------
+function deal() {
+  let deck = shuffle(createDeck());
+  S.hands[0] = deck.splice(0, DEAL);
+  S.hands[1] = deck.splice(0, DEAL);
+  let start = deck.pop();
+  let tries=0;
+  while ((start.number===20 || [1,2,5,8,14].includes(start.number)) && tries<15 && deck.length) {
+    deck.unshift(start); start=deck.pop(); tries++;
+  }
+  S.table = [start];
+  S.market = deck;
+  S.requiredShape = null;
+  S.pendingPenalty = 0;
+  S.penaltyType = null;
+  S.gameOver = false;
+  S.winner = null;
+  S.turn = Math.random()<0.5 ? 0 : 1;
+  S.awaitingWhot = false;
+}
+
+function applyEffect(card, player) {
+  const opp = 1 - player;
+  if (card.number !== 20) S.requiredShape = null;
+
+  if (card.number === 1) { // Hold On
+    S.turn = player;
+    return 'holdon';
+  }
+  if (card.number === 2) {
+    S.pendingPenalty = (S.pendingPenalty>0 && S.penaltyType==='2') ? S.pendingPenalty+2 : 2;
+    S.penaltyType = '2';
+    S.turn = opp;
+    return 'pick2';
+  }
+  if (card.number === 5) {
+    S.pendingPenalty = (S.pendingPenalty>0 && S.penaltyType==='5') ? S.pendingPenalty+3 : 3;
+    S.penaltyType = '5';
+    S.turn = opp;
+    return 'pick3';
+  }
+  if (card.number === 8) { // Suspension → play again in 2p
+    S.turn = player;
+    return 'suspend';
+  }
+  if (card.number === 14) { // General Market
+    draw(opp, 1);
+    S.turn = player;
+    return 'market';
+  }
+  // normal
+  S.turn = opp;
+  return 'normal';
+}
+
+function playCard(player, cardId, chosenShape) {
+  if (S.gameOver || S.turn !== player) return false;
+  const hand = S.hands[player];
+  const idx = hand.findIndex(c => c.id === cardId);
+  if (idx === -1) return false;
+  const card = hand[idx];
+  const top = S.table[S.table.length-1];
+  if (!isValid(card, top, S.requiredShape, S.pendingPenalty, S.penaltyType)) return false;
+
+  hand.splice(idx, 1);
+  S.table.push(card);
+
+  if (hand.length === 0) {
+    endGame(player);
+    return true;
+  }
+
+  if (card.number === 20) {
+    S.requiredShape = chosenShape || 'circle';
+    S.pendingPenalty = 0;
+    S.penaltyType = null;
+    S.turn = 1 - player;
+    msg(`${pname(player)} played WHOT → ${S.requiredShape.toUpperCase()}`);
+  } else {
+    const eff = applyEffect(card, player);
+    let m = `${pname(player)} played ${card.shape} ${card.number}`;
+    if (eff==='pick2') m += ` — Pick Two! (${S.pendingPenalty})`;
+    if (eff==='pick3') m += ` — Pick Three! (${S.pendingPenalty})`;
+    if (eff==='suspend') m += ' — Suspension!';
+    if (eff==='holdon') m += ' — Hold On!';
+    if (eff==='market') m += ' — General Market!';
+    msg(m);
+  }
+  afterMove();
+  return true;
+}
+
+function doDraw(player) {
+  if (S.gameOver || S.turn !== player) return;
+  if (S.pendingPenalty > 0) {
+    const n = S.pendingPenalty;
+    draw(player, n);
+    S.pendingPenalty = 0;
+    S.penaltyType = null;
+    S.turn = 1 - player;
+    msg(`${pname(player)} picked ${n} from market`);
+  } else {
+    draw(player, 1);
+    S.turn = 1 - player;
+    msg(`${pname(player)} went to market`);
+  }
+  afterMove();
+}
+
+function endGame(winner) {
+  S.gameOver = true;
+  S.winner = winner;
+  clearTimer();
+  const loser = 1 - winner;
+  S.scores[loser] = scoreHand(S.hands[loser]);
+  S.scores[winner] = 0;
+  render();
+  showGameOver();
+}
+
+function afterMove() {
+  render();
+  if (S.gameOver) return;
+  // Hotseat pass screen
+  if (S.mode === 'hotseat' && S.turn === 1) {
+    S.passPending = true;
+    $('#overlay-pass').classList.add('show');
+    $('#pass-title').textContent = "Player 2's Turn";
+    return;
+  }
+  if (S.mode === 'hotseat' && S.turn === 0 && S.passPending) {
+    // already handled
+  }
+  // AI turn
+  if (S.mode === 'ai' && S.turn === 1) {
+    clearTimer();
+    setTimeout(aiMove, 700 + Math.random()*600);
+  } else {
+    startTimer();
+  }
+}
+
+// ---------- AI ----------
+function aiMove() {
+  if (S.gameOver || S.turn !== 1) return;
+  const hand = S.hands[1];
+  const top = S.table[S.table.length-1];
+  const playable = hand.filter(c => isValid(c, top, S.requiredShape, S.pendingPenalty, S.penaltyType));
+
+  if (playable.length === 0) {
+    doDraw(1);
+    return;
+  }
+
+  // Prefer: finish, then specials that hurt, then matching number, then shape
+  let best = playable[0];
+  // Can I win?
+  const winCard = playable.find(c => hand.length === 1);
+  if (winCard) best = winCard;
+  else {
+    // Prefer stacking / attacking
+    const attack = playable.find(c => [2,5,14,8,1].includes(c.number));
+    if (attack) best = attack;
+    else {
+      // Prefer number match over shape
+      const numMatch = playable.find(c => c.number === top.number && c.number !== 20);
+      if (numMatch) best = numMatch;
+    }
+  }
+
+  if (best.number === 20) {
+    // Call the shape AI has most of
+    const counts = {};
+    SHAPES.forEach(s => counts[s]=0);
+    hand.forEach(c => { if (c.shape !== 'whot') counts[c.shape] = (counts[c.shape]||0)+1; });
+    let bestShape = 'circle', max= -1;
+    for (const s of SHAPES) if (counts[s] > max) { max=counts[s]; bestShape=s; }
+    playCard(1, best.id, bestShape);
+  } else {
+    playCard(1, best.id, null);
+  }
+}
+
+// ---------- TIMER ----------
+function startTimer() {
+  clearTimer();
+  if (S.gameOver || (S.mode==='ai' && S.turn===1)) return;
+  S.deadline = Date.now() + TURN_MS;
+  $('#timer-wrap').style.display = 'block';
+  const bar = $('#timer-bar');
+  const tick = () => {
+    const left = Math.max(0, S.deadline - Date.now());
+    const pct = (left / TURN_MS) * 100;
+    bar.style.width = pct + '%';
+    bar.classList.toggle('critical', pct < 25);
+    if (left <= 0) {
+      clearTimer();
+      // Auto draw
+      doDraw(S.turn);
+    }
+  };
+  tick();
+  S.timer = setInterval(tick, 100);
+}
+function clearTimer() {
+  if (S.timer) { clearInterval(S.timer); S.timer = null; }
+  $('#timer-wrap').style.display = 'none';
+}
+
+// ---------- RENDER ----------
+function $(sel){return document.querySelector(sel)}
+function pname(p){
+  if (S.mode==='ai') return p===0 ? 'You' : 'AI';
+  return p===0 ? 'Player 1' : 'Player 2';
+}
+
+function renderCard(card, opts={}) {
+  const d = document.createElement('div');
+  d.className = 'card' + (opts.disabled?' disabled':'') + (opts.playable?' playable':'') + (opts.selected?' selected':'') + (opts.nohover?' nohover':'');
+  d.dataset.id = card.id;
+  if (card.number === 20) {
+    d.innerHTML = `<div class="card-face whot"><span class="card-num top">20</span><div class="card-shape"><span class="whot-txt">WHOT</span></div><span class="card-num bot">20</span></div>`;
+  } else {
+    d.innerHTML = `<div class="card-face"><span class="card-num top">${card.number}</span><div class="card-shape">${SVG[card.shape]||''}</div><span class="card-num bot">${card.number}</span></div>`;
+  }
+  return d;
+}
+
+function render() {
+  // Opp hand
+  const oppEl = $('#opp-hand');
+  oppEl.innerHTML = '';
+  const oppCount = S.hands[1].length;
+  for (let i=0;i<oppCount;i++) {
+    const b = document.createElement('div');
+    b.className = 'card-back';
+    oppEl.appendChild(b);
+  }
+
+  // Market
+  $('#market-count').textContent = S.market.length;
+
+  // Table
+  const slot = $('#table-slot');
+  slot.innerHTML = '';
+  if (S.table.length) {
+    const c = renderCard(S.table[S.table.length-1], {nohover:true});
+    c.style.width = 'calc(var(--card-w)*1.12)';
+    c.style.height = 'calc(var(--card-h)*1.12)';
+    c.style.cursor = 'default';
+    slot.appendChild(c);
+  }
+
+  // Required shape
+  $('#req-shape').textContent = S.requiredShape ? `Call: ${S.requiredShape.toUpperCase()}` : '';
+
+  // Penalty
+  const pen = $('#penalty-banner');
+  if (S.pendingPenalty > 0 && S.turn === 0) {
+    pen.classList.add('show');
+    $('#penalty-num').textContent = S.pendingPenalty;
+  } else pen.classList.remove('show');
+
+  // Turn badge
+  const badge = $('#turn-badge');
+  if (S.gameOver) {
+    badge.textContent = 'Game Over';
+    badge.className = 'turn-badge';
+  } else if (S.turn === 0) {
+    badge.textContent = S.mode==='hotseat' ? "Player 1's Turn" : 'Your Turn';
+    badge.className = 'turn-badge mine';
+  } else {
+    badge.textContent = S.mode==='hotseat' ? "Player 2's Turn" : "AI's Turn";
+    badge.className = 'turn-badge theirs';
+  }
+
+  // My hand (always show player 0's hand; in hotseat we swap view via pass)
+  const handEl = $('#my-hand');
+  handEl.innerHTML = '';
+  const myHand = S.hands[0]; // In hotseat after pass we physically swap hands
+  const top = S.table[S.table.length-1];
+  myHand.forEach((card, i) => {
+    const playable = !S.gameOver && S.turn===0 && isValid(card, top, S.requiredShape, S.pendingPenalty, S.penaltyType);
+    const el = renderCard(card, {playable, disabled: S.turn!==0 || S.gameOver});
+    el.style.animationDelay = (i*0.03)+'s';
+    el.addEventListener('click', () => onCardClick(card));
+    handEl.appendChild(el);
+  });
+
+  // Draw button
+  $('#btn-draw').disabled = S.gameOver || S.turn !== 0;
+}
+
+// In hotseat we swap the actual hands array so UI always shows "my" as hands[0]
+function swapHotseat() {
+  // Swap hands, turn stays pointing to logical player but we normalize so current is always 0
+  // Simpler: keep turn as-is, but when showing, if turn===1 and hotseat, we already blocked with overlay.
+  // On continue: swap hands so current player always sees hands[0]
+  const tmp = S.hands[0];
+  S.hands[0] = S.hands[1];
+  S.hands[1] = tmp;
+  S.turn = 0; // after swap, current player is always index 0
+  S.passPending = false;
+}
+
+// ---------- UI EVENTS ----------
+function onCardClick(card) {
+  if (S.gameOver || S.turn !== 0) return;
+  const top = S.table[S.table.length-1];
+  if (!isValid(card, top, S.requiredShape, S.pendingPenalty, S.penaltyType)) {
+    toast('Cannot play that card');
+    return;
+  }
+  if (card.number === 20) {
+    S.awaitingWhot = true;
+    showWhotPicker(card.id);
+    return;
+  }
+  playCard(0, card.id, null);
+}
+
+function showWhotPicker(cardId) {
+  const grid = $('#shape-grid');
+  grid.innerHTML = '';
+  SHAPES.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'shape-btn';
+    b.innerHTML = SVG[s];
+    b.addEventListener('click', () => {
+      $('#overlay-whot').classList.remove('show');
+      S.awaitingWhot = false;
+      playCard(0, cardId, s);
+    });
+    grid.appendChild(b);
+  });
+  $('#overlay-whot').classList.add('show');
+}
+
+function showGameOver() {
+  const won = S.winner === 0;
+  $('#go-emoji').textContent = won ? '🏆' : '😔';
+  if (S.mode === 'ai') {
+    $('#go-title').textContent = won ? 'You Win!' : 'AI Wins';
+    $('#go-sub').textContent = won ? 'You emptied your hand first' : 'Better luck next time';
+  } else {
+    $('#go-title').textContent = `Player ${S.winner+1} Wins!`;
+    $('#go-sub').textContent = 'First to empty their hand';
+  }
+  const labels = S.mode==='ai' ? ['You','AI'] : ['Player 1','Player 2'];
+  // Note: after possible swaps scores still map to original? For simplicity show current
+  $('#go-scores').innerHTML = `
+    <div class="score-line">${labels[0]}: <strong>${S.scores[0]} pts</strong></div>
+    <div class="score-line">${labels[1]}: <strong>${S.scores[1]} pts</strong></div>`;
+  $('#overlay-gameover').classList.add('show');
+}
+
+function msg(t) {
+  const el = $('#sys-msg');
+  el.textContent = t;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.style.opacity='0.5', 3500);
+}
+function toast(t) {
+  const el = $('#toast');
+  el.textContent = t;
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+function floatReact(e) {
+  const el = $('#float-react');
+  el.textContent = e;
+  el.style.opacity = '1';
+  el.style.transform = 'translate(-50%,-50%) scale(1)';
+  setTimeout(() => {
+    el.style.opacity='0';
+    el.style.transform='translate(-50%,-90%) scale(1.5)';
+  }, 60);
+  setTimeout(() => {
+    el.style.transition='none';
+    el.style.opacity='0';
+    el.style.transform='translate(-50%,-50%) scale(.5)';
+    setTimeout(()=>el.style.transition='',40);
+  }, 800);
+}
+
+function startGame(mode) {
+  S.mode = mode;
+  $('#opp-label').textContent = mode==='ai' ? 'AI' : 'Player 2';
+  deal();
+  $('#screen-menu').classList.remove('active');
+  $('#screen-game').classList.add('active');
+  $('#overlay-gameover').classList.remove('show');
+  render();
+  msg(S.turn===0 ? 'You start!' : (mode==='ai'?'AI starts...':'Player 2 starts'));
+  if (S.mode==='ai' && S.turn===1) {
+    setTimeout(aiMove, 800);
+  } else if (S.mode==='hotseat' && S.turn===1) {
+    // Swap so P2 sees their cards as "my hand"
+    swapHotseat();
+    render();
+    startTimer();
+  } else {
+    startTimer();
+  }
+}
+
+// ---------- BINDINGS ----------
+$('#btn-vs-ai').addEventListener('click', () => startGame('ai'));
+$('#btn-hotseat').addEventListener('click', () => startGame('hotseat'));
+
+$('#btn-draw').addEventListener('click', () => {
+  if (S.turn===0 && !S.gameOver) doDraw(0);
+});
+$('#market-pile').addEventListener('click', () => $('#btn-draw').click());
+
+$('#btn-quit').addEventListener('click', () => {
+  if (confirm('Quit to menu?')) {
+    clearTimer();
+    S.gameOver = true;
+    $('#screen-game').classList.remove('active');
+    $('#screen-menu').classList.add('active');
+    $('#overlay-gameover').classList.remove('show');
+  }
+});
+
+$('#btn-again').addEventListener('click', () => {
+  $('#overlay-gameover').classList.remove('show');
+  startGame(S.mode);
+});
+$('#btn-menu').addEventListener('click', () => {
+  clearTimer();
+  $('#overlay-gameover').classList.remove('show');
+  $('#screen-game').classList.remove('active');
+  $('#screen-menu').classList.add('active');
+});
+
+$('#btn-pass-ok').addEventListener('click', () => {
+  $('#overlay-pass').classList.remove('show');
+  swapHotseat();
+  render();
+  startTimer();
+  msg("Your turn");
+});
+
+document.querySelectorAll('.reaction-btn').forEach(b => {
+  b.addEventListener('click', () => floatReact(b.dataset.e));
+});
+
+// Prevent accidental scroll/zoom
+document.addEventListener('gesturestart', e => e.preventDefault());
+})();
+</script>
+</body>
+</html>
